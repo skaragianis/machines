@@ -1,0 +1,263 @@
+---
+- name: Provision debian dev
+  hosts: debian_dev
+  gather_facts: true
+  vars_prompt:
+    - name: machine_ip
+      prompt: "Machine IP address"
+      private: false
+    - name: ansible_become_password
+      prompt: "Sudo password for {{ debian_dev_user | default('dev') }}"
+      private: true
+  tasks:
+    # Bootstrap just added dev to the sudo group. The persistent SSH session
+    # from the bootstrap play predates that change and lacks the group, so
+    # reconnect to pick up fresh group membership before any sudo task.
+    - name: Reset SSH connection so new sudo group membership takes effect
+      ansible.builtin.meta: reset_connection
+
+    # --- Privileged (sudo) ---
+    - name: Install apt packages
+      become: true
+      ansible.builtin.apt:
+        name: "{{ apt_packages }}"
+        state: present
+        update_cache: true
+
+    - name: Add dev to the docker group
+      become: true
+      ansible.builtin.user:
+        name: "{{ debian_dev_user }}"
+        groups: docker
+        append: true
+
+    - name: Ensure fish is listed in /etc/shells
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/shells
+        line: "{{ fish_path }}"
+        state: present
+
+    - name: Set fish as dev's default shell
+      become: true
+      ansible.builtin.user:
+        name: "{{ debian_dev_user }}"
+        shell: "{{ fish_path }}"
+
+    - name: Install Task (taskfile.dev) to /usr/local/bin
+      become: true
+      ansible.builtin.shell:
+        cmd: "curl -fsSL https://taskfile.dev/install.sh | sh -s -- -b /usr/local/bin"
+        creates: /usr/local/bin/task
+
+    # --- Ghostty terminfo (generate on Mac, load on VM) ---
+    - name: Generate ghostty terminfo on the control node
+      delegate_to: localhost
+      become: false
+      ansible.builtin.command:
+        cmd: infocmp -x xterm-ghostty
+      register: ghostty_terminfo
+      changed_when: false
+
+    - name: Copy ghostty terminfo to the VM
+      ansible.builtin.copy:
+        content: "{{ ghostty_terminfo.stdout }}\n"
+        dest: "/home/{{ debian_dev_user }}/ghostty.terminfo"
+        owner: "{{ debian_dev_user }}"
+        group: "{{ debian_dev_user }}"
+        mode: "0644"
+
+    - name: Check whether ghostty terminfo is already known
+      ansible.builtin.command:
+        cmd: infocmp xterm-ghostty
+      register: ghostty_check
+      changed_when: false
+      failed_when: false
+
+    - name: Load ghostty terminfo
+      ansible.builtin.command:
+        cmd: "tic -x /home/{{ debian_dev_user }}/ghostty.terminfo"
+      when: ghostty_check.rc != 0
+      changed_when: true
+
+    # --- GitHub SSH key (run as dev) ---
+    - name: Ensure dev's .ssh directory exists
+      ansible.builtin.file:
+        path: "/home/{{ debian_dev_user }}/.ssh"
+        state: directory
+        mode: "0700"
+
+    - name: Generate GitHub SSH keypair for dev
+      community.crypto.openssh_keypair:
+        path: "/home/{{ debian_dev_user }}/.ssh/id_ed25519"
+        type: ed25519
+        comment: "{{ github_key_comment }}"
+
+    - name: Read the GitHub public key
+      ansible.builtin.slurp:
+        src: "/home/{{ debian_dev_user }}/.ssh/id_ed25519.pub"
+      register: github_pubkey
+
+    - name: Show GitHub public key (add it at github.com/settings/keys)
+      ansible.builtin.debug:
+        msg: "{{ github_pubkey.content | b64decode }}"
+
+    - name: Check whether fnm is installed
+      ansible.builtin.stat:
+        path: "/home/{{ debian_dev_user }}/.local/share/fnm/fnm"
+      register: fnm_bin
+
+    - name: Install fnm
+      ansible.builtin.shell:
+        cmd: "curl -fsSL https://fnm.vercel.app/install | bash"
+        executable: /bin/bash
+      when: not fnm_bin.stat.exists
+      changed_when: true
+
+    - name: Ensure fish conf.d directory exists
+      ansible.builtin.file:
+        path: "/home/{{ debian_dev_user }}/.config/fish/conf.d"
+        state: directory
+        mode: "0755"
+
+    - name: Configure fish to load fnm (PATH + env, default Node, npm globals)
+      ansible.builtin.copy:
+        dest: "/home/{{ debian_dev_user }}/.config/fish/conf.d/fnm.fish"
+        mode: "0644"
+        content: |
+          if test -d "$HOME/.local/share/fnm"
+              set -gx PATH "$HOME/.local/share/fnm" $PATH
+              fnm env --use-on-cd --shell fish | source
+          end
+
+    - name: Configure fish to initialize zoxide
+      ansible.builtin.copy:
+        dest: "/home/{{ debian_dev_user }}/.config/fish/conf.d/zoxide.fish"
+        mode: "0644"
+        content: |
+          if type -q zoxide
+              zoxide init fish | source
+          end
+
+    - name: Configure fish to initialize fzf key bindings
+      ansible.builtin.copy:
+        dest: "/home/{{ debian_dev_user }}/.config/fish/conf.d/fzf.fish"
+        mode: "0644"
+        content: |
+          if type -q fzf
+              # fzf >= 0.48 ships `fzf --fish`; older Debian packages ship a key-bindings file
+              if fzf --fish &>/dev/null
+                  fzf --fish | source
+              else if test -f /usr/share/doc/fzf/examples/key-bindings.fish
+                  source /usr/share/doc/fzf/examples/key-bindings.fish
+                  fzf_key_bindings
+              end
+          end
+
+    - name: List installed Node versions
+      ansible.builtin.shell:
+        cmd: |
+          export PATH="$HOME/.local/share/fnm:$PATH"
+          fnm list
+        executable: /bin/bash
+      register: fnm_list
+      changed_when: false
+
+    - name: Install Node LTS and set it as default
+      ansible.builtin.shell:
+        cmd: |
+          export PATH="$HOME/.local/share/fnm:$PATH"
+          eval "$(fnm env)"
+          fnm install --lts
+          fnm default lts-latest
+        executable: /bin/bash
+      when: "'lts' not in (fnm_list.stdout | lower)"
+      changed_when: true
+
+    - name: Check whether claude-code is installed
+      ansible.builtin.shell:
+        cmd: |
+          export PATH="$HOME/.local/share/fnm:$PATH"
+          eval "$(fnm env)"
+          which claude
+        executable: /bin/bash
+      register: claude_check
+      changed_when: false
+      failed_when: false
+
+    - name: Configure npm allow-scripts for claude-code
+      ansible.builtin.shell:
+        cmd: |
+          export PATH="$HOME/.local/share/fnm:$PATH"
+          eval "$(fnm env)"
+          npm config set allow-scripts=@anthropic-ai/claude-code --location=user
+        executable: /bin/bash
+      when: claude_check.rc != 0
+      changed_when: true
+
+    - name: Install claude-code globally
+      ansible.builtin.shell:
+        cmd: |
+          export PATH="$HOME/.local/share/fnm:$PATH"
+          eval "$(fnm env)"
+          npm install -g @anthropic-ai/claude-code
+        executable: /bin/bash
+      when: claude_check.rc != 0
+      changed_when: true
+
+    - name: Check whether codex is installed
+      ansible.builtin.shell:
+        cmd: |
+          export PATH="$HOME/.local/share/fnm:$PATH"
+          eval "$(fnm env)"
+          which codex
+        executable: /bin/bash
+      register: codex_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install codex globally
+      ansible.builtin.shell:
+        cmd: |
+          export PATH="$HOME/.local/share/fnm:$PATH"
+          eval "$(fnm env)"
+          npm install -g @openai/codex
+        executable: /bin/bash
+      when: codex_check.rc != 0
+      changed_when: true
+
+    - name: Ensure fish functions directory exists
+      ansible.builtin.file:
+        path: "/home/{{ debian_dev_user }}/.config/fish/functions"
+        state: directory
+        mode: "0755"
+
+    - name: Add fish shortcut functions (cc, gd, gp, ga)
+      ansible.builtin.copy:
+        dest: "/home/{{ debian_dev_user }}/.config/fish/functions/{{ item.name }}.fish"
+        mode: "0644"
+        content: |
+          # Managed by dev-vm-ansible
+          function {{ item.name }} --wraps {{ item.wraps }} --description '{{ item.cmd }}'
+              {{ item.cmd }} $argv
+          end
+      loop:
+        - { name: cc, cmd: "claude --dangerously-skip-permissions", wraps: claude }
+        - { name: gd, cmd: "git diff", wraps: git }
+        - { name: gp, cmd: "git push", wraps: git }
+        - { name: ga, cmd: "git add", wraps: git }
+
+    # --- tmux config ---
+    - name: Install tmux config for dev (from the Mac's ~/.tmux.conf)
+      ansible.builtin.copy:
+        src: "{{ '~/.tmux.conf' | expanduser }}"
+        dest: "/home/{{ debian_dev_user }}/.tmux.conf"
+        owner: "{{ debian_dev_user }}"
+        group: "{{ debian_dev_user }}"
+        mode: "0644"
+
+    # --- Final reminders ---
+    - name: Remaining manual steps
+      ansible.builtin.debug:
+        msg:
+          - "1. Add the SSH public key printed above to https://github.com/settings/keys"

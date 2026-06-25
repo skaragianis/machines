@@ -1,0 +1,26 @@
+---
+debian_dev_user: dev
+# Public key read from the control node (Mac) and installed for dev:
+mac_pubkey_path: "~/.ssh/id_ed25519.pub"
+
+apt_packages:
+  - curl
+  - gnupg
+  - docker.io
+  - docker-compose
+  - tmux
+  - vim
+  - ripgrep
+  - wget
+  - git
+  - htop
+  - unzip
+  - zip
+  - fish
+  - golang-go
+  - zoxide
+  - fzf
+
+fish_path: /usr/bin/fish
+github_key_comment: debian-dev-vm
+node_version: lts-latest
