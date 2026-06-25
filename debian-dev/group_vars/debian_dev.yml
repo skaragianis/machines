@@ -20,7 +20,11 @@ apt_packages:
   - golang-go
   - zoxide
   - fzf
+  - lazygit
 
 fish_path: /usr/bin/fish
 github_key_comment: debian-dev-vm
 node_version: lts-latest
+git_user_name: Steffan Karagianis
+git_user_email: steffan.karagianis@gmail.com
+git_default_branch: main

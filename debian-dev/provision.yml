@@ -80,7 +80,6 @@
       when: ghostty_check.rc != 0
       changed_when: true
 
-    # --- GitHub SSH key (run as dev) ---
     - name: Ensure dev's .ssh directory exists
       ansible.builtin.file:
         path: "/home/{{ debian_dev_user }}/.ssh"
@@ -247,7 +246,19 @@
         - { name: gp, cmd: "git push", wraps: git }
         - { name: ga, cmd: "git add", wraps: git }
 
-    # --- tmux config ---
+    - name: Write dev's global git config
+      ansible.builtin.copy:
+        dest: "/home/{{ debian_dev_user }}/.gitconfig"
+        owner: "{{ debian_dev_user }}"
+        group: "{{ debian_dev_user }}"
+        mode: "0644"
+        content: |
+          [user]
+          	name = {{ git_user_name }}
+          	email = {{ git_user_email }}
+          [init]
+          	defaultBranch = {{ git_default_branch }}
+
     - name: Install tmux config for dev (from the Mac's ~/.tmux.conf)
       ansible.builtin.copy:
         src: "{{ '~/.tmux.conf' | expanduser }}"
@@ -256,7 +267,6 @@
         group: "{{ debian_dev_user }}"
         mode: "0644"
 
-    # --- Final reminders ---
     - name: Remaining manual steps
       ansible.builtin.debug:
         msg:
