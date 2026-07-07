@@ -9,7 +9,7 @@ apt_packages:
   - docker.io
   - docker-compose
   - tmux
-  - vim
+  - neovim
   - ripgrep
   - wget
   - git
@@ -21,6 +21,8 @@ apt_packages:
   - zoxide
   - fzf
   - lazygit
+  - build-essential
+  - cmake
 
 fish_path: /usr/bin/fish
 github_key_comment: debian-dev-vm

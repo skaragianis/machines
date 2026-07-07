@@ -20,10 +20,10 @@ Provisions a fresh Debian machine as a dev server. Run from the Mac.
 
 ```bash
 cd debian-dev
-ansible-playbook site.yml --ask-pass -e machine_ip=192.168.65.10
+ansible-playbook site.yml --ask-pass -e machine_ip=<machine_ip>
 ```
 
-After bootstrap, SSH password auth is disabled (key-only) and `dev` is a sudoer.
+After bootstrap, SSH password auth is disabled (key-only) and `dev` is a sudoer. You *MUST* copy the new public key over to github before running again to complete the installation.
 
 ## Re-runs (key auth)
 

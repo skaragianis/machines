@@ -307,7 +307,10 @@
     - name: Initialize and apply dotfiles with chezmoi
       ansible.builtin.command:
         cmd: "chezmoi init --apply {{ dotfiles_repo }}"
-        creates: "/home/{{ debian_dev_user }}/.local/share/chezmoi"
+        # Check .git, not the source dir itself: a failed clone (e.g. the
+        # deploy key not on GitHub yet) still leaves the empty source dir
+        # behind, which previously made `creates` skip every re-run forever.
+        creates: "/home/{{ debian_dev_user }}/.local/share/chezmoi/.git"
 
     - name: Remaining manual steps
       ansible.builtin.debug:
