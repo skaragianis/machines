@@ -28,3 +28,5 @@ node_version: lts-latest
 git_user_name: Steffan Karagianis
 git_user_email: steffan.karagianis@gmail.com
 git_default_branch: main
+git_default_editor: nvim
+dotfiles_repo: git@github.com:skaragianis/dotfiles.git

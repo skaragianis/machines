@@ -289,16 +289,28 @@
           	email = {{ git_user_email }}
           [init]
           	defaultBranch = {{ git_default_branch }}
+          [core]
+            editor = {{ git_default_editor }}
 
-    - name: Install tmux config for dev (from the Mac's ~/.tmux.conf)
-      ansible.builtin.copy:
-        src: "{{ '~/.tmux.conf' | expanduser }}"
-        dest: "/home/{{ debian_dev_user }}/.tmux.conf"
-        owner: "{{ debian_dev_user }}"
-        group: "{{ debian_dev_user }}"
-        mode: "0644"
+    - name: Add github.com to dev's known_hosts
+      ansible.builtin.known_hosts:
+        name: github.com
+        key: "{{ lookup('ansible.builtin.pipe', 'ssh-keyscan -t ed25519 github.com') }}"
+        path: "/home/{{ debian_dev_user }}/.ssh/known_hosts"
+
+    - name: Install chezmoi to /usr/local/bin
+      become: true
+      ansible.builtin.shell:
+        cmd: "sh -c \"$(curl -fsLS get.chezmoi.io)\" -- -b /usr/local/bin"
+        creates: /usr/local/bin/chezmoi
+
+    - name: Initialize and apply dotfiles with chezmoi
+      ansible.builtin.command:
+        cmd: "chezmoi init --apply {{ dotfiles_repo }}"
+        creates: "/home/{{ debian_dev_user }}/.local/share/chezmoi"
 
     - name: Remaining manual steps
       ansible.builtin.debug:
         msg:
           - "1. Add the SSH public key printed above to https://github.com/settings/keys"
+          - "2. If the chezmoi step above failed because that key wasn't added to GitHub yet, add it and re-run provision.yml"
