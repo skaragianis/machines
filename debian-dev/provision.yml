@@ -121,6 +121,11 @@
         cmd: "curl -LsSf https://astral.sh/uv/install.sh | sh"
         creates: "/home/{{ debian_dev_user }}/.local/bin/uv"
 
+    - name: Install ruff (astral.sh)
+      ansible.builtin.shell:
+        cmd: "curl -LsSf https://astral.sh/ruff/install.sh | sh"
+        creates: "/home/{{ debian_dev_user }}/.local/bin/ruff"
+
     # --- Ghostty terminfo (generate on Mac, load on VM) ---
     - name: Generate ghostty terminfo on the control node
       delegate_to: localhost
