@@ -81,6 +81,11 @@
         cmd: "curl -fsSL https://taskfile.dev/install.sh | sh -s -- -b /usr/local/bin"
         creates: /usr/local/bin/task
 
+    - name: Install uv (astral.sh)
+      ansible.builtin.shell:
+        cmd: "curl -LsSf https://astral.sh/uv/install.sh | sh"
+        creates: "/home/{{ debian_dev_user }}/.local/bin/uv"
+
     # --- Ghostty terminfo (generate on Mac, load on VM) ---
     - name: Generate ghostty terminfo on the control node
       delegate_to: localhost
