@@ -9,7 +9,6 @@ apt_packages:
   - docker.io
   - docker-compose
   - tmux
-  - neovim
   - ripgrep
   - wget
   - git

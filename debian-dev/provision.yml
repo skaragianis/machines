@@ -24,6 +24,41 @@
         state: present
         update_cache: true
 
+    # Debian's apt package lags upstream releases, so install the latest
+    # stable Neovim straight from GitHub instead. The "stable" tag is
+    # continuously repointed at the current release. force:true re-fetches
+    # it every run but only reports changed (Neovim publishes no per-asset
+    # checksum file to check against instead) when the content actually
+    # differs from what's already on disk, so extraction only runs on
+    # real updates.
+    - name: Determine Neovim release architecture
+      ansible.builtin.set_fact:
+        nvim_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'x86_64' }}"
+
+    - name: Download latest stable Neovim release
+      become: true
+      ansible.builtin.get_url:
+        url: "https://github.com/neovim/neovim/releases/download/stable/nvim-linux-{{ nvim_arch }}.tar.gz"
+        dest: "/opt/nvim-linux-{{ nvim_arch }}.tar.gz"
+        force: true
+      register: nvim_download
+
+    - name: Extract Neovim release
+      become: true
+      ansible.builtin.unarchive:
+        src: "/opt/nvim-linux-{{ nvim_arch }}.tar.gz"
+        dest: /opt/
+        remote_src: true
+      when: nvim_download.changed
+
+    - name: Symlink nvim into /usr/local/bin
+      become: true
+      ansible.builtin.file:
+        src: "/opt/nvim-linux-{{ nvim_arch }}/bin/nvim"
+        dest: /usr/local/bin/nvim
+        state: link
+        force: true
+
     - name: Download GitHub CLI apt keyring
       become: true
       ansible.builtin.shell:
