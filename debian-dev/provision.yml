@@ -24,6 +24,16 @@
         state: present
         update_cache: true
 
+    # Debian ships fd-find's binary as fdfind (fd is taken by an unrelated
+    # package), so symlink it to the expected name.
+    - name: Symlink fdfind to fd
+      become: true
+      ansible.builtin.file:
+        src: /usr/bin/fdfind
+        dest: /usr/local/bin/fd
+        state: link
+        force: true
+
     # Debian's apt package lags upstream releases, so install the latest
     # stable Neovim straight from GitHub instead. The "stable" tag is
     # continuously repointed at the current release. force:true re-fetches
@@ -58,6 +68,41 @@
         dest: /usr/local/bin/nvim
         state: link
         force: true
+
+    # Same rationale as Neovim above: pull the latest release straight from
+    # GitHub rather than relying on Debian's apt package. The "latest"
+    # redirect always points at the newest tag, so force:true re-fetches it
+    # every run but only reports changed when the content actually differs.
+    - name: Determine yazi release architecture
+      ansible.builtin.set_fact:
+        yazi_arch: "{{ 'aarch64' if ansible_facts['architecture'] == 'aarch64' else 'x86_64' }}"
+
+    - name: Download latest yazi release
+      become: true
+      ansible.builtin.get_url:
+        url: "https://github.com/sxyazi/yazi/releases/latest/download/yazi-{{ yazi_arch }}-unknown-linux-gnu.zip"
+        dest: "/opt/yazi-{{ yazi_arch }}-unknown-linux-gnu.zip"
+        force: true
+      register: yazi_download
+
+    - name: Extract yazi release
+      become: true
+      ansible.builtin.unarchive:
+        src: "/opt/yazi-{{ yazi_arch }}-unknown-linux-gnu.zip"
+        dest: /opt/
+        remote_src: true
+      when: yazi_download.changed
+
+    - name: Symlink yazi and ya into /usr/local/bin
+      become: true
+      ansible.builtin.file:
+        src: "/opt/yazi-{{ yazi_arch }}-unknown-linux-gnu/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        state: link
+        force: true
+      loop:
+        - yazi
+        - ya
 
     - name: Download GitHub CLI apt keyring
       become: true
