@@ -155,9 +155,17 @@
         name: "{{ debian_dev_user }}"
         shell: "{{ fish_path }}"
 
+    # get.oh-my.fish's redirector is unreachable from this network ("No
+    # route to host" upstream of this VM, unrelated to DNS/IPv6), so fetch
+    # the installer straight from GitHub instead, which is reachable. `set
+    # -e` plus `curl -f` make a failed download abort the script instead of
+    # silently running fish against an empty file and reporting success.
     - name: Install oh-my-fish
       ansible.builtin.shell:
-        cmd: "curl -L https://get.oh-my.fish | fish"
+        cmd: |
+          set -e
+          curl -fsSL https://raw.githubusercontent.com/oh-my-fish/oh-my-fish/master/bin/install > /tmp/omf-install.fish
+          fish /tmp/omf-install.fish --noninteractive
         creates: "/home/{{ debian_dev_user }}/.local/share/omf"
 
     - name: Install Task (taskfile.dev) to /usr/local/bin
