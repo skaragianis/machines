@@ -234,46 +234,6 @@
       when: not fnm_bin.stat.exists
       changed_when: true
 
-    - name: Ensure fish conf.d directory exists
-      ansible.builtin.file:
-        path: "/home/{{ debian_dev_user }}/.config/fish/conf.d"
-        state: directory
-        mode: "0755"
-
-    - name: Configure fish to load fnm (PATH + env, default Node, npm globals)
-      ansible.builtin.copy:
-        dest: "/home/{{ debian_dev_user }}/.config/fish/conf.d/fnm.fish"
-        mode: "0644"
-        content: |
-          if test -d "$HOME/.local/share/fnm"
-              set -gx PATH "$HOME/.local/share/fnm" $PATH
-              fnm env --use-on-cd --shell fish | source
-          end
-
-    - name: Configure fish to initialize zoxide
-      ansible.builtin.copy:
-        dest: "/home/{{ debian_dev_user }}/.config/fish/conf.d/zoxide.fish"
-        mode: "0644"
-        content: |
-          if type -q zoxide
-              zoxide init fish | source
-          end
-
-    - name: Configure fish to initialize fzf key bindings
-      ansible.builtin.copy:
-        dest: "/home/{{ debian_dev_user }}/.config/fish/conf.d/fzf.fish"
-        mode: "0644"
-        content: |
-          if type -q fzf
-              # fzf >= 0.48 ships `fzf --fish`; older Debian packages ship a key-bindings file
-              if fzf --fish &>/dev/null
-                  fzf --fish | source
-              else if test -f /usr/share/doc/fzf/examples/key-bindings.fish
-                  source /usr/share/doc/fzf/examples/key-bindings.fish
-                  fzf_key_bindings
-              end
-          end
-
     - name: List installed Node versions
       ansible.builtin.shell:
         cmd: |
@@ -345,27 +305,6 @@
         executable: /bin/bash
       when: codex_check.rc != 0
       changed_when: true
-
-    - name: Ensure fish functions directory exists
-      ansible.builtin.file:
-        path: "/home/{{ debian_dev_user }}/.config/fish/functions"
-        state: directory
-        mode: "0755"
-
-    - name: Add fish shortcut functions (cc, gd, gp, ga)
-      ansible.builtin.copy:
-        dest: "/home/{{ debian_dev_user }}/.config/fish/functions/{{ item.name }}.fish"
-        mode: "0644"
-        content: |
-          # Managed by dev-vm-ansible
-          function {{ item.name }} --wraps {{ item.wraps }} --description '{{ item.cmd }}'
-              {{ item.cmd }} $argv
-          end
-      loop:
-        - { name: cc, cmd: "claude --dangerously-skip-permissions", wraps: claude }
-        - { name: gd, cmd: "git diff", wraps: git }
-        - { name: gp, cmd: "git push", wraps: git }
-        - { name: ga, cmd: "git add", wraps: git }
 
     - name: Write dev's global git config
       ansible.builtin.copy:

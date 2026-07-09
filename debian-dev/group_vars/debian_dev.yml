@@ -18,6 +18,7 @@ apt_packages:
   - htop
   - lazygit
   - ripgrep
+  - sqlite3
   - tmux
   - unzip
   - wget
