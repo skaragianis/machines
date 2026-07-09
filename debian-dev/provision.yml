@@ -155,6 +155,11 @@
         name: "{{ debian_dev_user }}"
         shell: "{{ fish_path }}"
 
+    - name: Install oh-my-fish
+      ansible.builtin.shell:
+        cmd: "curl -L https://get.oh-my.fish | fish"
+        creates: "/home/{{ debian_dev_user }}/.local/share/omf"
+
     - name: Install Task (taskfile.dev) to /usr/local/bin
       become: true
       ansible.builtin.shell:
