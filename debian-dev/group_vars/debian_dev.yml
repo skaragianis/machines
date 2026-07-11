@@ -1,7 +1,13 @@
 ---
 debian_dev_user: dev
-# Public key read from the control node (Mac) and installed for dev:
-mac_pubkey_path: "~/.ssh/id_ed25519.pub"
+
+# Public keys allowed to log in as dev. This list is the single source of
+# truth: it is installed with exclusive: true, so a key that isn't here is
+# removed from the host on the next run. To grant a new machine access, add
+# its public key below and re-run provision.yml from a machine that already
+# has access (password auth is off, so a new machine can't grant itself).
+dev_authorized_keys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC5CUHJESCu51g4NqYtk9GDrD6hsZ6lkGoOrR1yZTEUB steffan.karagianis@gmail.com" # mac
 
 # Only slow-moving system packages stay on apt. Fast-moving developer tools
 # (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide) are installed directly from

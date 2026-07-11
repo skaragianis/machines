@@ -12,7 +12,7 @@ Provisions a fresh Debian machine as a dev server. Run from the Mac.
 
 - `ansible` (installed via the repo Brewfile).
 - `sshpass` for the first password-based run: `brew install sshpass`.
-- `~/.ssh/id_ed25519.pub` present (installed into dev's authorized_keys).
+- The Mac's public key listed in `dev_authorized_keys` (see [SSH access](#ssh-access)).
 - Ghostty installed (provides the `xterm-ghostty` terminfo for `infocmp`).
 - Install collections once: `ansible-galaxy collection install -r requirements.yml`.
 
@@ -39,6 +39,24 @@ Prompts only for `dev`'s sudo password. Idempotent — safe to run repeatedly.
 1. Add the printed GitHub public key at <https://github.com/settings/keys>.
 2. If the chezmoi init/apply task failed because that key wasn't on GitHub yet, re-run `provision.yml` once it's added.
 3. (Optional) In VS Code install **Open Remote - SSH** and connect to the host.
+
+## SSH access
+
+`dev_authorized_keys` in `group_vars/debian_dev.yml` lists every public key that
+may log in as `dev`. It is installed with `exclusive: true`, so it is the single
+source of truth — a key that isn't in the list is removed from the host on the
+next run, and hand-editing `authorized_keys` on the machine won't survive.
+
+To grant another machine (e.g. the Ubuntu laptop) SSH access:
+
+1. On that machine, print its public key (`cat ~/.ssh/id_ed25519.pub`; run
+   `ssh-keygen -t ed25519` first if it has none).
+2. Add that line to `dev_authorized_keys`.
+3. Re-run `provision.yml` **from a machine that already has access** — password
+   auth is off, so a new machine cannot grant itself entry.
+
+The new machine only needs an SSH client; it doesn't need Ansible. Playbooks are
+still run from the Mac.
 
 ## Dotfiles
 

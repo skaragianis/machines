@@ -39,11 +39,14 @@
         groups: sudo
         append: true
 
-    - name: Install Mac public key in debian dev's authorized_keys
+    # Must happen before password auth is disabled below, or the next run has
+    # no way in. provision.yml re-applies the same list on every run, which is
+    # how a laptop added later gets access.
+    - name: Install authorized keys for dev
       ansible.posix.authorized_key:
         user: "{{ debian_dev_user }}"
-        state: present
-        key: "{{ lookup('ansible.builtin.file', mac_pubkey_path | expanduser) }}"
+        key: "{{ dev_authorized_keys | join('\n') }}"
+        exclusive: true
 
     - name: Disable SSH password authentication
       ansible.builtin.lineinfile:

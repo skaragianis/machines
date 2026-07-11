@@ -16,6 +16,15 @@
     - name: Reset SSH connection so new sudo group membership takes effect
       ansible.builtin.meta: reset_connection
 
+    # Runs first so that a play failing further down still leaves every
+    # authorized key in place. exclusive: true makes dev_authorized_keys the
+    # source of truth — a key added by hand on the host is removed here.
+    - name: Install authorized keys for dev
+      ansible.posix.authorized_key:
+        user: "{{ debian_dev_user }}"
+        key: "{{ dev_authorized_keys | join('\n') }}"
+        exclusive: true
+
     # --- Privileged (sudo) ---
     # state: latest so every run upgrades these to the newest version apt
     # offers, rather than leaving whatever first landed pinned.
