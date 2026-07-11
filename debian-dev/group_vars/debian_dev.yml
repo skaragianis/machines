@@ -17,6 +17,8 @@ apt_packages:
   - golang-go
   - htop
   - lazygit
+  - libclang-dev
+  - libtree-sitter-dev
   - ripgrep
   - sqlite3
   - tmux

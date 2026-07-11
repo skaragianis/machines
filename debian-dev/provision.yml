@@ -34,13 +34,6 @@
         state: link
         force: true
 
-    # Debian's apt package lags upstream releases, so install the latest
-    # stable Neovim straight from GitHub instead. The "stable" tag is
-    # continuously repointed at the current release. force:true re-fetches
-    # it every run but only reports changed (Neovim publishes no per-asset
-    # checksum file to check against instead) when the content actually
-    # differs from what's already on disk, so extraction only runs on
-    # real updates.
     - name: Determine Neovim release architecture
       ansible.builtin.set_fact:
         nvim_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'x86_64' }}"
@@ -179,10 +172,23 @@
         cmd: "curl -LsSf https://astral.sh/uv/install.sh | sh"
         creates: "/home/{{ debian_dev_user }}/.local/bin/uv"
 
-    - name: Install ruff (astral.sh)
+    - name: Install ruff (uv tool)
       ansible.builtin.shell:
-        cmd: "curl -LsSf https://astral.sh/ruff/install.sh | sh"
+        cmd: "$HOME/.local/bin/uv tool install ruff@latest"
         creates: "/home/{{ debian_dev_user }}/.local/bin/ruff"
+
+    - name: Install ty (uv tool)
+      ansible.builtin.shell:
+        cmd: "$HOME/.local/bin/uv tool install ty@latest"
+        creates: "/home/{{ debian_dev_user }}/.local/bin/ty"
+
+    # --no-modify-path: dev's shell is fish (managed via chezmoi in the
+    # dotfiles repo), which doesn't read the .profile/.bashrc rustup would
+    # otherwise edit, so skip that and let dotfiles own PATH.
+    - name: Install rustup (cargo, rustc)
+      ansible.builtin.shell:
+        cmd: "curl https://sh.rustup.rs | sh -s -- -y --no-modify-path"
+        creates: "/home/{{ debian_dev_user }}/.cargo/bin/cargo"
 
     # --- Ghostty terminfo (generate on Mac, load on VM) ---
     - name: Generate ghostty terminfo on the control node
@@ -235,65 +241,84 @@
       ansible.builtin.debug:
         msg: "{{ github_pubkey.content | b64decode }}"
 
-    - name: Check whether fnm is installed
+    - name: Check whether pnpm is installed
       ansible.builtin.stat:
-        path: "/home/{{ debian_dev_user }}/.local/share/fnm/fnm"
-      register: fnm_bin
+        path: "/home/{{ debian_dev_user }}/.local/share/pnpm/pnpm"
+      register: pnpm_bin
 
-    - name: Install fnm
+    # This task runs before chezmoi applies dotfiles and is invoked via dev's
+    # fish login shell, so it must not depend on the ambient environment (which
+    # may carry a stale/leaked PNPM_HOME). Pin PNPM_HOME to the Linux location
+    # like every other pnpm task below does. Persistent interactive PNPM_HOME is
+    # owned separately by chezmoi (conf.d/path.fish); we don't write a dotfile.
+    - name: Install pnpm
       ansible.builtin.shell:
-        cmd: "curl -fsSL https://fnm.vercel.app/install | bash"
+        cmd: |
+          export PNPM_HOME="$HOME/.local/share/pnpm"
+          curl -fsSL https://get.pnpm.io/install.sh | sh -
         executable: /bin/bash
-      when: not fnm_bin.stat.exists
+      when: not pnpm_bin.stat.exists
       changed_when: true
 
-    - name: List installed Node versions
+    - name: Check whether Node.js is installed via pnpm
       ansible.builtin.shell:
         cmd: |
-          export PATH="$HOME/.local/share/fnm:$PATH"
-          fnm list
+          export PNPM_HOME="$HOME/.local/share/pnpm"
+          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
+          which node
         executable: /bin/bash
-      register: fnm_list
+      register: node_check
       changed_when: false
+      failed_when: false
 
-    - name: Install Node LTS and set it as default
+    - name: Install Node LTS via pnpm
       ansible.builtin.shell:
         cmd: |
-          export PATH="$HOME/.local/share/fnm:$PATH"
-          eval "$(fnm env)"
-          fnm install --lts
-          fnm default lts-latest
+          export PNPM_HOME="$HOME/.local/share/pnpm"
+          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
+          pnpm env use --global lts
         executable: /bin/bash
-      when: "'lts' not in (fnm_list.stdout | lower)"
+      when: node_check.rc != 0
+      changed_when: true
+
+    - name: Check whether tree-sitter CLI is installed
+      ansible.builtin.shell:
+        cmd: |
+          export PNPM_HOME="$HOME/.local/share/pnpm"
+          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
+          which tree-sitter
+        executable: /bin/bash
+      register: tree_sitter_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install tree-sitter CLI via pnpm
+      ansible.builtin.shell:
+        cmd: |
+          export PNPM_HOME="$HOME/.local/share/pnpm"
+          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
+          pnpm add -g tree-sitter-cli
+        executable: /bin/bash
+      when: tree_sitter_check.rc != 0
       changed_when: true
 
     - name: Check whether claude-code is installed
       ansible.builtin.shell:
         cmd: |
-          export PATH="$HOME/.local/share/fnm:$PATH"
-          eval "$(fnm env)"
+          export PNPM_HOME="$HOME/.local/share/pnpm"
+          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
           which claude
         executable: /bin/bash
       register: claude_check
       changed_when: false
       failed_when: false
 
-    - name: Configure npm allow-scripts for claude-code
-      ansible.builtin.shell:
-        cmd: |
-          export PATH="$HOME/.local/share/fnm:$PATH"
-          eval "$(fnm env)"
-          npm config set allow-scripts=@anthropic-ai/claude-code --location=user
-        executable: /bin/bash
-      when: claude_check.rc != 0
-      changed_when: true
-
     - name: Install claude-code globally
       ansible.builtin.shell:
         cmd: |
-          export PATH="$HOME/.local/share/fnm:$PATH"
-          eval "$(fnm env)"
-          npm install -g @anthropic-ai/claude-code
+          export PNPM_HOME="$HOME/.local/share/pnpm"
+          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
+          pnpm add -g --allow-build=@anthropic-ai/claude-code @anthropic-ai/claude-code
         executable: /bin/bash
       when: claude_check.rc != 0
       changed_when: true
@@ -301,8 +326,8 @@
     - name: Check whether codex is installed
       ansible.builtin.shell:
         cmd: |
-          export PATH="$HOME/.local/share/fnm:$PATH"
-          eval "$(fnm env)"
+          export PNPM_HOME="$HOME/.local/share/pnpm"
+          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
           which codex
         executable: /bin/bash
       register: codex_check
@@ -312,9 +337,9 @@
     - name: Install codex globally
       ansible.builtin.shell:
         cmd: |
-          export PATH="$HOME/.local/share/fnm:$PATH"
-          eval "$(fnm env)"
-          npm install -g @openai/codex
+          export PNPM_HOME="$HOME/.local/share/pnpm"
+          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
+          pnpm add -g @openai/codex
         executable: /bin/bash
       when: codex_check.rc != 0
       changed_when: true
@@ -346,13 +371,30 @@
         cmd: "sh -c \"$(curl -fsLS get.chezmoi.io)\" -- -b /usr/local/bin"
         creates: /usr/local/bin/chezmoi
 
-    - name: Initialize and apply dotfiles with chezmoi
+    - name: Clone the dotfiles source with chezmoi (first run only)
       ansible.builtin.command:
-        cmd: "chezmoi init --apply {{ dotfiles_repo }}"
+        cmd: "chezmoi init {{ dotfiles_repo }}"
         # Check .git, not the source dir itself: a failed clone (e.g. the
         # deploy key not on GitHub yet) still leaves the empty source dir
         # behind, which previously made `creates` skip every re-run forever.
         creates: "/home/{{ debian_dev_user }}/.local/share/chezmoi/.git"
+
+    # Pull the latest dotfiles on every run so changes roll out without a manual
+    # `chezmoi update` on the VM.
+    - name: Pull latest dotfiles with chezmoi
+      ansible.builtin.command:
+        cmd: "chezmoi update --apply=false"
+      changed_when: true
+
+    # Apply separately with --force. pnpm's installer appends a block to the
+    # chezmoi-managed config.fish; without --force chezmoi tries to prompt about
+    # that drift and dies on the TTY-less ansible connection. config.fish is
+    # fully chezmoi-owned (path.fish provides PNPM_HOME), so discarding the
+    # external edit is the correct outcome.
+    - name: Apply dotfiles with chezmoi (force overwrites external drift)
+      ansible.builtin.command:
+        cmd: "chezmoi apply --force"
+      changed_when: true
 
     - name: Remaining manual steps
       ansible.builtin.debug:
