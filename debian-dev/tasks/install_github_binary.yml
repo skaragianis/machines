@@ -1,0 +1,69 @@
+---
+# Included once per entry in github_release_tools (loop_var: tool). Resolves the
+# latest release tag from the GitHub API, downloads that release's asset,
+# extracts it under /opt/<name>/, and symlinks the binaries into
+# /usr/local/bin. get_url force:true re-fetches every run but only reports
+# changed when the release actually moved, so extraction (and the resulting
+# churn) only happens on a real version bump — the box tracks latest without
+# pointless work. The GitHub API is hit unauthenticated (one call per
+# latest-tracking tool, well under the 60/hour limit; pinned-tag tools skip it).
+# Tools that track a fixed rolling tag (e.g. Neovim's "stable") set `tag:` in
+# their spec and skip the API call; everything else resolves the newest release.
+- name: "{{ tool.name }}: resolve latest release tag"
+  ansible.builtin.uri:
+    url: "https://api.github.com/repos/{{ tool.repo }}/releases/latest"
+    headers:
+      Accept: application/vnd.github+json
+  register: gh_release
+  when: tool.tag is not defined
+
+- name: "{{ tool.name }}: pin the release tag"
+  ansible.builtin.set_fact:
+    gh_tag: "{{ tool.tag if tool.tag is defined else gh_release.json.tag_name }}"
+
+# Expand the {version}/{target} placeholders in the asset/subdir templates now
+# that the tag is known. {version} drops any leading "v"; {target} maps this
+# host's architecture to the project's release-target string.
+- name: "{{ tool.name }}: compute release facts"
+  ansible.builtin.set_fact:
+    gh_asset: >-
+      {{ tool.asset
+         | replace('{version}', gh_tag | regex_replace('^v', ''))
+         | replace('{target}', tool.target[ansible_facts['architecture']]) }}
+    gh_subdir: >-
+      {{ tool.subdir
+         | replace('{version}', gh_tag | regex_replace('^v', ''))
+         | replace('{target}', tool.target[ansible_facts['architecture']]) }}
+
+- name: "{{ tool.name }}: create extraction directory"
+  become: true
+  ansible.builtin.file:
+    path: "/opt/{{ tool.name }}"
+    state: directory
+    mode: "0755"
+
+- name: "{{ tool.name }}: download latest release asset"
+  become: true
+  ansible.builtin.get_url:
+    url: "https://github.com/{{ tool.repo }}/releases/download/{{ gh_tag }}/{{ gh_asset }}"
+    dest: "/opt/{{ tool.name }}/{{ gh_asset }}"
+    mode: "0644"
+    force: true
+  register: gh_download
+
+- name: "{{ tool.name }}: extract release asset"
+  become: true
+  ansible.builtin.unarchive:
+    src: "/opt/{{ tool.name }}/{{ gh_asset }}"
+    dest: "/opt/{{ tool.name }}"
+    remote_src: true
+  when: gh_download.changed
+
+- name: "{{ tool.name }}: symlink binaries into /usr/local/bin"
+  become: true
+  ansible.builtin.file:
+    src: "/opt/{{ tool.name }}/{{ (gh_subdir ~ '/') if gh_subdir else '' }}{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    state: link
+    force: true
+  loop: "{{ tool.bins }}"

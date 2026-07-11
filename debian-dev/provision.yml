@@ -17,85 +17,86 @@
       ansible.builtin.meta: reset_connection
 
     # --- Privileged (sudo) ---
+    # state: latest so every run upgrades these to the newest version apt
+    # offers, rather than leaving whatever first landed pinned.
     - name: Install apt packages
       become: true
       ansible.builtin.apt:
         name: "{{ apt_packages }}"
-        state: present
+        state: latest
         update_cache: true
 
-    # Debian ships fd-find's binary as fdfind (fd is taken by an unrelated
-    # package), so symlink it to the expected name.
-    - name: Symlink fdfind to fd
-      become: true
-      ansible.builtin.file:
-        src: /usr/bin/fdfind
-        dest: /usr/local/bin/fd
-        state: link
-        force: true
-
-    - name: Determine Neovim release architecture
+    # Debian's golang-go lags well behind upstream, so install the latest Go
+    # toolchain straight from go.dev. go.dev/VERSION returns the newest release
+    # (e.g. "go1.25.1") on its first line; we reinstall only when that differs
+    # from what's on disk.
+    - name: Determine Go release architecture
       ansible.builtin.set_fact:
-        nvim_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'x86_64' }}"
+        go_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}"
 
-    - name: Download latest stable Neovim release
+    - name: Resolve latest Go version
+      ansible.builtin.uri:
+        url: https://go.dev/VERSION?m=text
+        return_content: true
+      register: go_latest
+
+    - name: Extract Go version string
+      ansible.builtin.set_fact:
+        go_version: "{{ go_latest.content.split('\n')[0] | trim }}"
+
+    - name: Check installed Go version
+      ansible.builtin.command: /usr/local/go/bin/go version
+      register: go_installed
+      changed_when: false
+      failed_when: false
+
+    - name: Download latest Go tarball
       become: true
       ansible.builtin.get_url:
-        url: "https://github.com/neovim/neovim/releases/download/stable/nvim-linux-{{ nvim_arch }}.tar.gz"
-        dest: "/opt/nvim-linux-{{ nvim_arch }}.tar.gz"
+        url: "https://go.dev/dl/{{ go_version }}.linux-{{ go_arch }}.tar.gz"
+        dest: "/opt/{{ go_version }}.linux-{{ go_arch }}.tar.gz"
+        mode: "0644"
         force: true
-      register: nvim_download
+      when: go_version not in go_installed.stdout
+      register: go_download
 
-    - name: Extract Neovim release
-      become: true
-      ansible.builtin.unarchive:
-        src: "/opt/nvim-linux-{{ nvim_arch }}.tar.gz"
-        dest: /opt/
-        remote_src: true
-      when: nvim_download.changed
-
-    - name: Symlink nvim into /usr/local/bin
+    # Per go.dev's install docs: wipe the old tree before extracting so removed
+    # files don't linger across upgrades.
+    - name: Remove previous Go installation
       become: true
       ansible.builtin.file:
-        src: "/opt/nvim-linux-{{ nvim_arch }}/bin/nvim"
-        dest: /usr/local/bin/nvim
-        state: link
-        force: true
+        path: /usr/local/go
+        state: absent
+      when: go_download.changed
 
-    # Same rationale as Neovim above: pull the latest release straight from
-    # GitHub rather than relying on Debian's apt package. The "latest"
-    # redirect always points at the newest tag, so force:true re-fetches it
-    # every run but only reports changed when the content actually differs.
-    - name: Determine yazi release architecture
-      ansible.builtin.set_fact:
-        yazi_arch: "{{ 'aarch64' if ansible_facts['architecture'] == 'aarch64' else 'x86_64' }}"
-
-    - name: Download latest yazi release
-      become: true
-      ansible.builtin.get_url:
-        url: "https://github.com/sxyazi/yazi/releases/latest/download/yazi-{{ yazi_arch }}-unknown-linux-gnu.zip"
-        dest: "/opt/yazi-{{ yazi_arch }}-unknown-linux-gnu.zip"
-        force: true
-      register: yazi_download
-
-    - name: Extract yazi release
+    - name: Extract Go to /usr/local
       become: true
       ansible.builtin.unarchive:
-        src: "/opt/yazi-{{ yazi_arch }}-unknown-linux-gnu.zip"
-        dest: /opt/
+        src: "/opt/{{ go_version }}.linux-{{ go_arch }}.tar.gz"
+        dest: /usr/local
         remote_src: true
-      when: yazi_download.changed
+      when: go_download.changed
 
-    - name: Symlink yazi and ya into /usr/local/bin
+    - name: Symlink go and gofmt into /usr/local/bin
       become: true
       ansible.builtin.file:
-        src: "/opt/yazi-{{ yazi_arch }}-unknown-linux-gnu/{{ item }}"
+        src: "/usr/local/go/bin/{{ item }}"
         dest: "/usr/local/bin/{{ item }}"
         state: link
         force: true
       loop:
-        - yazi
-        - ya
+        - go
+        - gofmt
+
+    # neovim, yazi, fzf, lazygit, ripgrep, fd, zoxide: each pulled from a GitHub
+    # release (latest, or a pinned tag). See github_release_tools in group_vars
+    # and the shared task file.
+    - name: Install latest GitHub-release CLI tools
+      ansible.builtin.include_tasks: tasks/install_github_binary.yml
+      loop: "{{ github_release_tools }}"
+      loop_control:
+        loop_var: tool
+        label: "{{ tool.name }}"
 
     - name: Download GitHub CLI apt keyring
       become: true
@@ -125,7 +126,66 @@
       become: true
       ansible.builtin.apt:
         name: gh
+        state: latest
+        update_cache: true
+
+    # Debian's docker.io / docker-compose (v1) trail upstream and compose v1 is
+    # end-of-life, so install Docker Engine + Compose v2 from Docker's own apt
+    # repo. Purge the distro packages first so the two don't fight over the
+    # docker binary.
+    # docker-buildx and docker-compose-v2 are standalone Debian packages whose
+    # files (e.g. /usr/libexec/docker/cli-plugins/docker-buildx) collide with
+    # Docker's -plugin packages, so they must be purged too, not just docker.io.
+    - name: Remove distro Docker packages superseded by the official repo
+      become: true
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-compose
+          - docker-compose-v2
+          - docker-buildx
+          - docker-doc
+          - podman-docker
+          - containerd
+          - runc
+        state: absent
+
+    - name: Ensure /etc/apt/keyrings exists
+      become: true
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Docker apt keyring
+      become: true
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Add Docker apt repository
+      become: true
+      ansible.builtin.deb822_repository:
+        name: docker
+        types: deb
+        uris: https://download.docker.com/linux/debian
+        suites: "{{ ansible_facts['distribution_release'] }}"
+        components: stable
+        architectures: "{{ ansible_facts['architecture'] | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') }}"
+        signed_by: /etc/apt/keyrings/docker.asc
         state: present
+
+    - name: Install Docker Engine and Compose plugin
+      become: true
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: latest
         update_cache: true
 
     - name: Add dev to the docker group
@@ -161,26 +221,35 @@
           fish /tmp/omf-install.fish --noninteractive
         creates: "/home/{{ debian_dev_user }}/.local/share/omf"
 
-    - name: Install Task (taskfile.dev) to /usr/local/bin
+    - name: Update oh-my-fish
+      ansible.builtin.command:
+        cmd: fish -c "omf update"
+      changed_when: true
+      # omf pulls itself and its packages from git; a transient network failure
+      # shouldn't abort provisioning.
+      failed_when: false
+
+    # These installer-script / package-manager tools have no cheap "am I already
+    # on latest?" check, so they re-run every play (dropping the old install-once
+    # `creates:` guards) to pull the newest release, and report changed each time.
+    - name: Install/upgrade Task (taskfile.dev) to /usr/local/bin
       become: true
       ansible.builtin.shell:
         cmd: "curl -fsSL https://taskfile.dev/install.sh | sh -s -- -b /usr/local/bin"
-        creates: /usr/local/bin/task
+      changed_when: true
 
-    - name: Install uv (astral.sh)
+    - name: Install/upgrade uv (astral.sh)
       ansible.builtin.shell:
         cmd: "curl -LsSf https://astral.sh/uv/install.sh | sh"
-        creates: "/home/{{ debian_dev_user }}/.local/bin/uv"
+      changed_when: true
 
-    - name: Install ruff (uv tool)
-      ansible.builtin.shell:
-        cmd: "$HOME/.local/bin/uv tool install ruff@latest"
-        creates: "/home/{{ debian_dev_user }}/.local/bin/ruff"
-
-    - name: Install ty (uv tool)
-      ansible.builtin.shell:
-        cmd: "$HOME/.local/bin/uv tool install ty@latest"
-        creates: "/home/{{ debian_dev_user }}/.local/bin/ty"
+    - name: Install/upgrade uv-managed tools to latest
+      ansible.builtin.command:
+        cmd: "/home/{{ debian_dev_user }}/.local/bin/uv tool install --force --reinstall {{ item }}@latest"
+      loop:
+        - ruff
+        - ty
+      changed_when: true
 
     # --no-modify-path: dev's shell is fish (managed via chezmoi in the
     # dotfiles repo), which doesn't read the .profile/.bashrc rustup would
@@ -189,6 +258,14 @@
       ansible.builtin.shell:
         cmd: "curl https://sh.rustup.rs | sh -s -- -y --no-modify-path"
         creates: "/home/{{ debian_dev_user }}/.cargo/bin/cargo"
+
+    # rustup update tracks the latest stable toolchain (and updates rustup
+    # itself) on every run; changed only when it actually moves something.
+    - name: Update Rust toolchain to latest stable
+      ansible.builtin.command:
+        cmd: "/home/{{ debian_dev_user }}/.cargo/bin/rustup update stable"
+      register: rustup_update
+      changed_when: "'unchanged' not in rustup_update.stdout"
 
     # --- Ghostty terminfo (generate on Mac, load on VM) ---
     - name: Generate ghostty terminfo on the control node
@@ -241,107 +318,41 @@
       ansible.builtin.debug:
         msg: "{{ github_pubkey.content | b64decode }}"
 
-    - name: Check whether pnpm is installed
-      ansible.builtin.stat:
-        path: "/home/{{ debian_dev_user }}/.local/share/pnpm/pnpm"
-      register: pnpm_bin
-
-    # This task runs before chezmoi applies dotfiles and is invoked via dev's
-    # fish login shell, so it must not depend on the ambient environment (which
-    # may carry a stale/leaked PNPM_HOME). Pin PNPM_HOME to the Linux location
-    # like every other pnpm task below does. Persistent interactive PNPM_HOME is
-    # owned separately by chezmoi (conf.d/path.fish); we don't write a dotfile.
-    - name: Install pnpm
+    # These pnpm tasks run before chezmoi applies dotfiles and are invoked via
+    # dev's fish login shell, so they must not depend on the ambient environment
+    # (which may carry a stale/leaked PNPM_HOME). Each pins PNPM_HOME to the
+    # Linux location. Persistent interactive PNPM_HOME is owned separately by
+    # chezmoi (conf.d/path.fish); we don't write a dotfile. They run every play
+    # (no install-once guard) so pnpm, Node LTS, and the global CLIs all track
+    # the newest release.
+    - name: Install/upgrade pnpm
       ansible.builtin.shell:
         cmd: |
           export PNPM_HOME="$HOME/.local/share/pnpm"
           curl -fsSL https://get.pnpm.io/install.sh | sh -
         executable: /bin/bash
-      when: not pnpm_bin.stat.exists
       changed_when: true
 
-    - name: Check whether Node.js is installed via pnpm
-      ansible.builtin.shell:
-        cmd: |
-          export PNPM_HOME="$HOME/.local/share/pnpm"
-          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
-          which node
-        executable: /bin/bash
-      register: node_check
-      changed_when: false
-      failed_when: false
-
-    - name: Install Node LTS via pnpm
+    - name: Install/upgrade Node LTS via pnpm
       ansible.builtin.shell:
         cmd: |
           export PNPM_HOME="$HOME/.local/share/pnpm"
           export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
           pnpm env use --global lts
         executable: /bin/bash
-      when: node_check.rc != 0
       changed_when: true
 
-    - name: Check whether tree-sitter CLI is installed
+    - name: Install/upgrade global pnpm CLIs to latest
       ansible.builtin.shell:
         cmd: |
           export PNPM_HOME="$HOME/.local/share/pnpm"
           export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
-          which tree-sitter
+          pnpm add -g {{ item }}
         executable: /bin/bash
-      register: tree_sitter_check
-      changed_when: false
-      failed_when: false
-
-    - name: Install tree-sitter CLI via pnpm
-      ansible.builtin.shell:
-        cmd: |
-          export PNPM_HOME="$HOME/.local/share/pnpm"
-          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
-          pnpm add -g tree-sitter-cli
-        executable: /bin/bash
-      when: tree_sitter_check.rc != 0
-      changed_when: true
-
-    - name: Check whether claude-code is installed
-      ansible.builtin.shell:
-        cmd: |
-          export PNPM_HOME="$HOME/.local/share/pnpm"
-          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
-          which claude
-        executable: /bin/bash
-      register: claude_check
-      changed_when: false
-      failed_when: false
-
-    - name: Install claude-code globally
-      ansible.builtin.shell:
-        cmd: |
-          export PNPM_HOME="$HOME/.local/share/pnpm"
-          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
-          pnpm add -g --allow-build=@anthropic-ai/claude-code @anthropic-ai/claude-code
-        executable: /bin/bash
-      when: claude_check.rc != 0
-      changed_when: true
-
-    - name: Check whether codex is installed
-      ansible.builtin.shell:
-        cmd: |
-          export PNPM_HOME="$HOME/.local/share/pnpm"
-          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
-          which codex
-        executable: /bin/bash
-      register: codex_check
-      changed_when: false
-      failed_when: false
-
-    - name: Install codex globally
-      ansible.builtin.shell:
-        cmd: |
-          export PNPM_HOME="$HOME/.local/share/pnpm"
-          export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
-          pnpm add -g @openai/codex
-        executable: /bin/bash
-      when: codex_check.rc != 0
+      loop:
+        - tree-sitter-cli
+        - "--allow-build=@anthropic-ai/claude-code @anthropic-ai/claude-code"
+        - "@openai/codex"
       changed_when: true
 
     - name: Write dev's global git config
@@ -365,11 +376,14 @@
         key: "{{ lookup('ansible.builtin.pipe', 'ssh-keyscan -t ed25519 github.com') }}"
         path: "/home/{{ debian_dev_user }}/.ssh/known_hosts"
 
-    - name: Install chezmoi to /usr/local/bin
+    # No creates: guard — the installer fetches the latest chezmoi each run so
+    # the binary tracks upstream (dotfiles themselves are pulled separately
+    # below via chezmoi update).
+    - name: Install/upgrade chezmoi to /usr/local/bin
       become: true
       ansible.builtin.shell:
         cmd: "sh -c \"$(curl -fsLS get.chezmoi.io)\" -- -b /usr/local/bin"
-        creates: /usr/local/bin/chezmoi
+      changed_when: true
 
     - name: Clone the dotfiles source with chezmoi (first run only)
       ansible.builtin.command:

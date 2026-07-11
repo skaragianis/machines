@@ -3,29 +3,81 @@ debian_dev_user: dev
 # Public key read from the control node (Mac) and installed for dev:
 mac_pubkey_path: "~/.ssh/id_ed25519.pub"
 
+# Only slow-moving system packages stay on apt. Fast-moving developer tools
+# (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide) are installed directly from
+# upstream so every run tracks the latest release. See github_release_tools
+# below and the Go/Docker tasks in provision.yml.
 apt_packages:
   - build-essential
   - cmake
   - curl
-  - docker-compose
-  - docker.io
-  - fd-find
   - fish
-  - fzf
   - git
   - gnupg
-  - golang-go
   - htop
-  - lazygit
   - libclang-dev
   - libtree-sitter-dev
-  - ripgrep
   - sqlite3
   - tmux
   - unzip
   - wget
   - zip
-  - zoxide
+
+# CLI tools installed straight from their latest GitHub release by
+# tasks/install_github_binary.yml. Release asset names are wildly inconsistent
+# across projects, so each entry carries its own asset/subdir templates and an
+# arch → release-target map. The `{version}` / `{target}` placeholders are
+# expanded per-tool at run time by the task file (NOT Jinja `{{ }}` — this list
+# is fed through a `loop`, which would eagerly template `{{ }}` before those
+# facts exist, so single braces are used and substituted with `replace`).
+# `subdir` is the path inside the extracted archive that contains the binaries
+# ("" when they sit at the root); `bins` are the binaries under `subdir` to
+# symlink into /usr/local/bin. `tag` pins a fixed rolling release (e.g. Neovim's
+# "stable") instead of resolving the newest tag via the GitHub API.
+github_release_tools:
+  - name: neovim
+    repo: neovim/neovim
+    tag: stable
+    target: { x86_64: x86_64, aarch64: arm64 }
+    asset: "nvim-linux-{target}.tar.gz"
+    subdir: "nvim-linux-{target}/bin"
+    bins: [nvim]
+  - name: yazi
+    repo: sxyazi/yazi
+    target: { x86_64: x86_64, aarch64: aarch64 }
+    asset: "yazi-{target}-unknown-linux-gnu.zip"
+    subdir: "yazi-{target}-unknown-linux-gnu"
+    bins: [yazi, ya]
+  - name: fzf
+    repo: junegunn/fzf
+    target: { x86_64: amd64, aarch64: arm64 }
+    asset: "fzf-{version}-linux_{target}.tar.gz"
+    subdir: ""
+    bins: [fzf]
+  - name: lazygit
+    repo: jesseduffield/lazygit
+    target: { x86_64: x86_64, aarch64: arm64 }
+    asset: "lazygit_{version}_linux_{target}.tar.gz"
+    subdir: ""
+    bins: [lazygit]
+  - name: ripgrep
+    repo: BurntSushi/ripgrep
+    target: { x86_64: x86_64-unknown-linux-musl, aarch64: aarch64-unknown-linux-gnu }
+    asset: "ripgrep-{version}-{target}.tar.gz"
+    subdir: "ripgrep-{version}-{target}"
+    bins: [rg]
+  - name: fd
+    repo: sharkdp/fd
+    target: { x86_64: x86_64-unknown-linux-gnu, aarch64: aarch64-unknown-linux-gnu }
+    asset: "fd-v{version}-{target}.tar.gz"
+    subdir: "fd-v{version}-{target}"
+    bins: [fd]
+  - name: zoxide
+    repo: ajeetdsouza/zoxide
+    target: { x86_64: x86_64-unknown-linux-musl, aarch64: aarch64-unknown-linux-musl }
+    asset: "zoxide-{version}-{target}.tar.gz"
+    subdir: ""
+    bins: [zoxide]
 
 fish_path: /usr/bin/fish
 github_key_comment: debian-dev-vm
