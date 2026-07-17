@@ -97,9 +97,9 @@
         - go
         - gofmt
 
-    # neovim, yazi, fzf, lazygit, ripgrep, fd, zoxide: each pulled from a GitHub
-    # release (latest, or a pinned tag). See github_release_tools in group_vars
-    # and the shared task file.
+    # neovim, yazi, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk: each pulled from
+    # a GitHub release (latest, or a pinned tag). See github_release_tools in
+    # group_vars and the shared task file.
     - name: Install latest GitHub-release CLI tools
       ansible.builtin.include_tasks: tasks/install_github_binary.yml
       loop: "{{ github_release_tools }}"
@@ -362,6 +362,25 @@
         - tree-sitter-cli
         - "--allow-build=@anthropic-ai/claude-code @anthropic-ai/claude-code"
         - "@openai/codex"
+        - playwright
+      changed_when: true
+
+    # Chromium won't launch on a minimal Debian without a stack of shared
+    # libraries (libnss3, libgbm, libasound2, ...). Playwright knows its own
+    # dependency list per distro, so let it drive apt 
+    - name: Install Chromium system dependencies for Playwright
+      become: true
+      ansible.builtin.command:
+        cmd: "{{ pnpm_bin }}/playwright install-deps chromium"
+      environment:
+        PATH: "{{ pnpm_bin }}:{{ ansible_facts['env']['PATH'] }}"
+      changed_when: true
+
+    - name: Install Chromium for Playwright
+      ansible.builtin.command:
+        cmd: "{{ pnpm_bin }}/playwright install chromium"
+      environment:
+        PATH: "{{ pnpm_bin }}:{{ ansible_facts['env']['PATH'] }}"
       changed_when: true
 
     - name: Write dev's global git config

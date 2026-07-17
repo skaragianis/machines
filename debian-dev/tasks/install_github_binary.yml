@@ -9,6 +9,9 @@
 # latest-tracking tool, well under the 60/hour limit; pinned-tag tools skip it).
 # Tools that track a fixed rolling tag (e.g. Neovim's "stable") set `tag:` in
 # their spec and skip the API call; everything else resolves the newest release.
+# Most projects ship a tarball/zip; those that publish a bare executable as the
+# release asset (e.g. jq) set `archive: false` and are downloaded straight to
+# their final path instead of being extracted.
 - name: "{{ tool.name }}: resolve latest release tag"
   ansible.builtin.uri:
     url: "https://api.github.com/repos/{{ tool.repo }}/releases/latest"
@@ -34,6 +37,7 @@
       {{ tool.subdir
          | replace('{version}', gh_tag | regex_replace('^v', ''))
          | replace('{target}', tool.target[ansible_facts['architecture']]) }}
+    gh_archive: "{{ tool.archive | default(true) | bool }}"
 
 - name: "{{ tool.name }}: create extraction directory"
   become: true
@@ -42,12 +46,14 @@
     state: directory
     mode: "0755"
 
+# A bare-binary asset is its own artifact, so it lands executable (0755) and is
+# never extracted; an archive stays 0644 and is unpacked in the next task.
 - name: "{{ tool.name }}: download latest release asset"
   become: true
   ansible.builtin.get_url:
     url: "https://github.com/{{ tool.repo }}/releases/download/{{ gh_tag }}/{{ gh_asset }}"
     dest: "/opt/{{ tool.name }}/{{ gh_asset }}"
-    mode: "0644"
+    mode: "{{ '0644' if gh_archive else '0755' }}"
     force: true
   register: gh_download
 
@@ -57,12 +63,15 @@
     src: "/opt/{{ tool.name }}/{{ gh_asset }}"
     dest: "/opt/{{ tool.name }}"
     remote_src: true
-  when: gh_download.changed
+  when: gh_download.changed and gh_archive
 
+# For an archive the symlink target is <subdir>/<bin> inside the extracted tree;
+# for a bare binary the downloaded asset itself is the target, and `bins` just
+# names the command it's exposed as (jq-linux-arm64 -> /usr/local/bin/jq).
 - name: "{{ tool.name }}: symlink binaries into /usr/local/bin"
   become: true
   ansible.builtin.file:
-    src: "/opt/{{ tool.name }}/{{ (gh_subdir ~ '/') if gh_subdir else '' }}{{ item }}"
+    src: "/opt/{{ tool.name }}/{{ (gh_subdir ~ '/') if gh_subdir else '' }}{{ item if gh_archive else gh_asset }}"
     dest: "/usr/local/bin/{{ item }}"
     state: link
     force: true

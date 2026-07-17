@@ -11,9 +11,9 @@ dev_authorized_keys:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKDzZzVX1Q13Gs8W+c8MOnxg70gTl8jF8rh7dtF2p7Yw steffan.karagianis@gmail.com" # Kubuntu
 
 # Only slow-moving system packages stay on apt. Fast-moving developer tools
-# (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide) are installed directly from
-# upstream so every run tracks the latest release. See github_release_tools
-# below and the Go/Docker tasks in provision.yml.
+# (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk) are installed
+# directly from upstream so every run tracks the latest release. See
+# github_release_tools
 apt_packages:
   - build-essential
   - cmake
@@ -85,7 +85,22 @@ github_release_tools:
     asset: "zoxide-{version}-{target}.tar.gz"
     subdir: ""
     bins: [zoxide]
+  - name: jq
+    repo: jqlang/jq
+    archive: false
+    target: { x86_64: amd64, aarch64: arm64 }
+    asset: "jq-linux-{target}"
+    subdir: ""
+    bins: [jq]
+  - name: hunk
+    repo: modem-dev/hunk
+    target: { x86_64: x64, aarch64: arm64 }
+    asset: "hunkdiff-linux-{target}.tar.gz"
+    subdir: "hunkdiff-linux-{target}"
+    bins: [hunk]
 
+pnpm_home: "/home/{{ debian_dev_user }}/.local/share/pnpm"
+pnpm_bin: "{{ pnpm_home }}/bin"
 fish_path: /usr/bin/fish
 github_key_comment: debian-dev-vm
 node_version: lts-latest
