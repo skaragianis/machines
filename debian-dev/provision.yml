@@ -97,7 +97,7 @@
         - go
         - gofmt
 
-    # neovim, yazi, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk: each pulled from
+    # neovim, yazi, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk, herdr, pi: each pulled from
     # a GitHub release (latest, or a pinned tag). See github_release_tools in
     # group_vars and the shared task file.
     - name: Install latest GitHub-release CLI tools

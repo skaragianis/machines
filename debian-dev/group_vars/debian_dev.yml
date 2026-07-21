@@ -11,7 +11,7 @@ dev_authorized_keys:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKDzZzVX1Q13Gs8W+c8MOnxg70gTl8jF8rh7dtF2p7Yw steffan.karagianis@gmail.com" # Kubuntu
 
 # Only slow-moving system packages stay on apt. Fast-moving developer tools
-# (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk) are installed
+# (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk, herdr, pi) are installed
 # directly from upstream so every run tracks the latest release. See
 # github_release_tools
 apt_packages:
@@ -98,6 +98,19 @@ github_release_tools:
     asset: "hunkdiff-linux-{target}.tar.gz"
     subdir: "hunkdiff-linux-{target}"
     bins: [hunk]
+  - name: herdr
+    repo: ogulcancelik/herdr
+    archive: false
+    target: { x86_64: x86_64, aarch64: aarch64 }
+    asset: "herdr-linux-{target}"
+    subdir: ""
+    bins: [herdr]
+  - name: pi
+    repo: earendil-works/pi
+    target: { x86_64: x64, aarch64: arm64 }
+    asset: "pi-linux-{target}.tar.gz"
+    subdir: "pi"
+    bins: [pi]
 
 pnpm_home: "/home/{{ debian_dev_user }}/.local/share/pnpm"
 pnpm_bin: "{{ pnpm_home }}/bin"
