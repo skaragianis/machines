@@ -11,7 +11,8 @@ dev_authorized_keys:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKDzZzVX1Q13Gs8W+c8MOnxg70gTl8jF8rh7dtF2p7Yw steffan.karagianis@gmail.com" # Kubuntu
 
 # Only slow-moving system packages stay on apt. Fast-moving developer tools
-# (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk, herdr, pi) are installed
+# (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk, delta, difftastic,
+# herdr, pi) are installed
 # directly from upstream so every run tracks the latest release. See
 # github_release_tools
 apt_packages:
@@ -98,6 +99,18 @@ github_release_tools:
     asset: "hunkdiff-linux-{target}.tar.gz"
     subdir: "hunkdiff-linux-{target}"
     bins: [hunk]
+  - name: delta
+    repo: dandavison/delta
+    target: { x86_64: x86_64-unknown-linux-gnu, aarch64: aarch64-unknown-linux-gnu }
+    asset: "delta-{version}-{target}.tar.gz"
+    subdir: "delta-{version}-{target}"
+    bins: [delta]
+  - name: difftastic
+    repo: Wilfred/difftastic
+    target: { x86_64: x86_64-unknown-linux-gnu, aarch64: aarch64-unknown-linux-gnu }
+    asset: "difft-{target}.tar.gz"
+    subdir: ""
+    bins: [difft]
   - name: herdr
     repo: ogulcancelik/herdr
     archive: false
