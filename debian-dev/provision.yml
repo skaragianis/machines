@@ -48,6 +48,39 @@
         label: "{{ item.line }}"
       notify: Restart ssh
 
+    # --- Firewall (ufw) ---
+    - name: Install ufw
+      become: true
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+        update_cache: true
+
+    # Allow SSH BEFORE the default-deny policy is enabled below, otherwise
+    # enabling ufw would drop the connection this play runs over and lock us out.
+    - name: Allow SSH through the firewall
+      become: true
+      community.general.ufw:
+        rule: allow
+        port: ssh
+        proto: tcp
+
+    - name: Default-deny incoming, allow outgoing
+      become: true
+      community.general.ufw:
+        direction: "{{ item.direction }}"
+        policy: "{{ item.policy }}"
+      loop:
+        - { direction: incoming, policy: deny }
+        - { direction: outgoing, policy: allow }
+      loop_control:
+        label: "{{ item.direction }} {{ item.policy }}"
+
+    - name: Enable the firewall
+      become: true
+      community.general.ufw:
+        state: enabled
+
     # --- Privileged (sudo) ---
     # state: latest so every run upgrades these to the newest version apt
     # offers, rather than leaving whatever first landed pinned.
@@ -57,6 +90,38 @@
         name: "{{ apt_packages }}"
         state: latest
         update_cache: true
+
+    # --- Automatic security updates ---
+    - name: Install unattended-upgrades
+      become: true
+      ansible.builtin.apt:
+        name: unattended-upgrades
+        state: present
+        update_cache: true
+
+    - name: Enable periodic apt updates and unattended upgrades
+      become: true
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        mode: "0644"
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+
+    - name: Configure unattended-upgrades policy (security-only, no auto-reboot)
+      become: true
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/52unattended-upgrades-local
+        mode: "0644"
+        content: |
+          Unattended-Upgrade::Automatic-Reboot "false";
+
+    - name: Enable and start the unattended-upgrades service
+      become: true
+      ansible.builtin.service:
+        name: unattended-upgrades
+        enabled: true
+        state: started
 
     # Debian's golang-go lags well behind upstream, so install the latest Go
     # toolchain straight from go.dev. go.dev/VERSION returns the newest release
