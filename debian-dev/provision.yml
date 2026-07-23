@@ -25,6 +25,29 @@
         key: "{{ dev_authorized_keys | join('\n') }}"
         exclusive: true
 
+    # --- SSH hardening ---
+    - name: Harden sshd configuration
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        validate: "/usr/sbin/sshd -t -f %s"
+      loop:
+        - { regexp: '^#?\s*PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^#?\s*PasswordAuthentication', line: 'PasswordAuthentication no' }
+        - { regexp: '^#?\s*KbdInteractiveAuthentication', line: 'KbdInteractiveAuthentication no' }
+        # Old alias for the above; kept for sshd versions that predate the rename.
+        - { regexp: '^#?\s*ChallengeResponseAuthentication', line: 'ChallengeResponseAuthentication no' }
+        - { regexp: '^#?\s*PermitEmptyPasswords', line: 'PermitEmptyPasswords no' }
+        - { regexp: '^#?\s*MaxAuthTries', line: 'MaxAuthTries 3' }
+        - { regexp: '^#?\s*X11Forwarding', line: 'X11Forwarding no' }
+        # Only dev may log in; any other account is refused even with a valid key.
+        - { regexp: '^#?\s*AllowUsers', line: 'AllowUsers {{ debian_dev_user }}' }
+      loop_control:
+        label: "{{ item.line }}"
+      notify: Restart ssh
+
     # --- Privileged (sudo) ---
     # state: latest so every run upgrades these to the newest version apt
     # offers, rather than leaving whatever first landed pinned.
@@ -444,3 +467,11 @@
         msg:
           - "1. Add the SSH public key printed above to https://github.com/settings/keys"
           - "2. If the chezmoi step above failed because that key wasn't added to GitHub yet, add it and re-run provision.yml"
+
+  handlers:
+    # become: true here because this play sets sudo per-task, not play-wide.
+    - name: Restart ssh
+      become: true
+      ansible.builtin.service:
+        name: ssh
+        state: restarted
