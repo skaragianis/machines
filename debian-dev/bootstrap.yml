@@ -57,7 +57,4 @@
       notify: Restart ssh
 
   handlers:
-    - name: Restart ssh
-      ansible.builtin.service:
-        name: ssh
-        state: restarted
+    - import_tasks: handlers/restart_ssh.yml

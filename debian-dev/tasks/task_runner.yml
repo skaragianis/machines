@@ -1,0 +1,9 @@
+---
+# These installer-script / package-manager tools have no cheap "am I already
+# on latest?" check, so they re-run every play (dropping the old install-once
+# `creates:` guards) to pull the newest release, and report changed each time.
+- name: Install/upgrade Task (taskfile.dev) to /usr/local/bin
+  become: true
+  ansible.builtin.shell:
+    cmd: "curl -fsSL https://taskfile.dev/install.sh | sh -s -- -b /usr/local/bin"
+  changed_when: true

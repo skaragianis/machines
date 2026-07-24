@@ -1,0 +1,66 @@
+---
+# Debian's docker.io / docker-compose (v1) trail upstream and compose v1 is
+# end-of-life, so install Docker Engine + Compose v2 from Docker's own apt
+# repo. Purge the distro packages first so the two don't fight over the
+# docker binary.
+# docker-buildx and docker-compose-v2 are standalone Debian packages whose
+# files (e.g. /usr/libexec/docker/cli-plugins/docker-buildx) collide with
+# Docker's -plugin packages, so they must be purged too, not just docker.io.
+- name: Remove distro Docker packages superseded by the official repo
+  become: true
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - docker-compose
+      - docker-compose-v2
+      - docker-buildx
+      - docker-doc
+      - podman-docker
+      - containerd
+      - runc
+    state: absent
+
+- name: Ensure /etc/apt/keyrings exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Download Docker apt keyring
+  become: true
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/debian/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Add Docker apt repository
+  become: true
+  ansible.builtin.deb822_repository:
+    name: docker
+    types: deb
+    uris: https://download.docker.com/linux/debian
+    suites: "{{ ansible_facts['distribution_release'] }}"
+    components: stable
+    architectures: "{{ ansible_facts['architecture'] | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') }}"
+    signed_by: /etc/apt/keyrings/docker.asc
+    state: present
+
+- name: Install Docker Engine and Compose plugin
+  become: true
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: latest
+    update_cache: true
+
+- name: Add dev to the docker group
+  become: true
+  ansible.builtin.user:
+    name: "{{ debian_dev_user }}"
+    groups: docker
+    append: true

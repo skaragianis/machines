@@ -1,0 +1,32 @@
+---
+- name: Install ufw
+  become: true
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
+
+# Allow SSH BEFORE the default-deny policy is enabled below, otherwise
+# enabling ufw would drop the connection this play runs over and lock us out.
+- name: Allow SSH through the firewall
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: ssh
+    proto: tcp
+
+- name: Default-deny incoming, allow outgoing
+  become: true
+  community.general.ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: incoming, policy: deny }
+    - { direction: outgoing, policy: allow }
+  loop_control:
+    label: "{{ item.direction }} {{ item.policy }}"
+
+- name: Enable the firewall
+  become: true
+  community.general.ufw:
+    state: enabled

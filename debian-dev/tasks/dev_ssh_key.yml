@@ -1,0 +1,21 @@
+---
+- name: Ensure dev's .ssh directory exists
+  ansible.builtin.file:
+    path: "/home/{{ debian_dev_user }}/.ssh"
+    state: directory
+    mode: "0700"
+
+- name: Generate GitHub SSH keypair for dev
+  community.crypto.openssh_keypair:
+    path: "/home/{{ debian_dev_user }}/.ssh/id_ed25519"
+    type: ed25519
+    comment: "{{ github_key_comment }}"
+
+- name: Read the GitHub public key
+  ansible.builtin.slurp:
+    src: "/home/{{ debian_dev_user }}/.ssh/id_ed25519.pub"
+  register: github_pubkey
+
+- name: Show GitHub public key (add it at github.com/settings/keys)
+  ansible.builtin.debug:
+    msg: "{{ github_pubkey.content | b64decode }}"

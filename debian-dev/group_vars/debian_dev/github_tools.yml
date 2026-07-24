@@ -1,37 +1,4 @@
 ---
-debian_dev_user: dev
-
-# Public keys allowed to log in as dev. This list is the single source of
-# truth: it is installed with exclusive: true, so a key that isn't here is
-# removed from the host on the next run. To grant a new machine access, add
-# its public key below and re-run provision.yml from a machine that already
-# has access (password auth is off, so a new machine can't grant itself).
-dev_authorized_keys:
-  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC5CUHJESCu51g4NqYtk9GDrD6hsZ6lkGoOrR1yZTEUB steffan.karagianis@gmail.com" # mac
-  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKDzZzVX1Q13Gs8W+c8MOnxg70gTl8jF8rh7dtF2p7Yw steffan.karagianis@gmail.com" # Kubuntu
-  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICeP2nqLtn8DDbpNqBR4uk5VD08LnCmZi0NW85ESn6p5 moshi"
-
-# Only slow-moving system packages stay on apt. Fast-moving developer tools
-# (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk, delta, difftastic,
-# herdr, pi) are installed
-# directly from upstream so every run tracks the latest release. See
-# github_release_tools
-apt_packages:
-  - build-essential
-  - cmake
-  - curl
-  - fish
-  - git
-  - gnupg
-  - htop
-  - libclang-dev
-  - libtree-sitter-dev
-  - sqlite3
-  - tmux
-  - unzip
-  - wget
-  - zip
-
 # CLI tools installed straight from their latest GitHub release by
 # tasks/install_github_binary.yml. Release asset names are wildly inconsistent
 # across projects, so each entry carries its own asset/subdir templates and an
@@ -125,14 +92,3 @@ github_release_tools:
     asset: "pi-linux-{target}.tar.gz"
     subdir: "pi"
     bins: [pi]
-
-pnpm_home: "/home/{{ debian_dev_user }}/.local/share/pnpm"
-pnpm_bin: "{{ pnpm_home }}/bin"
-fish_path: /usr/bin/fish
-github_key_comment: debian-dev-vm
-node_version: lts-latest
-git_user_name: Steffan Karagianis
-git_user_email: steffan.karagianis@gmail.com
-git_default_branch: main
-git_default_editor: nvim
-dotfiles_repo: git@github.com:skaragianis/dotfiles.git

@@ -1,0 +1,16 @@
+---
+# --no-modify-path: dev's shell is fish (managed via chezmoi in the
+# dotfiles repo), which doesn't read the .profile/.bashrc rustup would
+# otherwise edit, so skip that and let dotfiles own PATH.
+- name: Install rustup (cargo, rustc)
+  ansible.builtin.shell:
+    cmd: "curl https://sh.rustup.rs | sh -s -- -y --no-modify-path"
+    creates: "/home/{{ debian_dev_user }}/.cargo/bin/cargo"
+
+# rustup update tracks the latest stable toolchain (and updates rustup
+# itself) on every run; changed only when it actually moves something.
+- name: Update Rust toolchain to latest stable
+  ansible.builtin.command:
+    cmd: "/home/{{ debian_dev_user }}/.cargo/bin/rustup update stable"
+  register: rustup_update
+  changed_when: "'unchanged' not in rustup_update.stdout"

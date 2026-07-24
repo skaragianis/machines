@@ -42,7 +42,7 @@ Prompts only for `dev`'s sudo password. Idempotent — safe to run repeatedly.
 
 ## SSH access
 
-`dev_authorized_keys` in `group_vars/debian_dev.yml` lists every public key that
+`dev_authorized_keys` in `group_vars/debian_dev/main.yml` lists every public key that
 may log in as `dev`. It is installed with `exclusive: true`, so it is the single
 source of truth — a key that isn't in the list is removed from the host on the
 next run, and hand-editing `authorized_keys` on the machine won't survive.
@@ -62,7 +62,7 @@ still run from the Mac.
 
 Dotfiles are managed with [chezmoi](https://www.chezmoi.io/), sourced from
 `git@github.com:skaragianis/dotfiles.git` (see `dotfiles_repo` in
-`group_vars/debian_dev.yml`) and applied automatically during provisioning.
+`group_vars/debian_dev/main.yml`) and applied automatically during provisioning.
 
 ## Usage
 

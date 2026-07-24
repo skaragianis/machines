@@ -1,0 +1,62 @@
+---
+# Debian's golang-go lags well behind upstream, so install the latest Go
+# toolchain straight from go.dev. go.dev/VERSION returns the newest release
+# (e.g. "go1.25.1") on its first line; we reinstall only when that differs
+# from what's on disk.
+- name: Determine Go release architecture
+  ansible.builtin.set_fact:
+    go_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}"
+
+- name: Resolve latest Go version
+  ansible.builtin.uri:
+    url: https://go.dev/VERSION?m=text
+    return_content: true
+  register: go_latest
+
+- name: Extract Go version string
+  ansible.builtin.set_fact:
+    go_version: "{{ go_latest.content.split('\n')[0] | trim }}"
+
+- name: Check installed Go version
+  ansible.builtin.command: /usr/local/go/bin/go version
+  register: go_installed
+  changed_when: false
+  failed_when: false
+
+- name: Download latest Go tarball
+  become: true
+  ansible.builtin.get_url:
+    url: "https://go.dev/dl/{{ go_version }}.linux-{{ go_arch }}.tar.gz"
+    dest: "/opt/{{ go_version }}.linux-{{ go_arch }}.tar.gz"
+    mode: "0644"
+    force: true
+  when: go_version not in go_installed.stdout
+  register: go_download
+
+# Per go.dev's install docs: wipe the old tree before extracting so removed
+# files don't linger across upgrades.
+- name: Remove previous Go installation
+  become: true
+  ansible.builtin.file:
+    path: /usr/local/go
+    state: absent
+  when: go_download.changed
+
+- name: Extract Go to /usr/local
+  become: true
+  ansible.builtin.unarchive:
+    src: "/opt/{{ go_version }}.linux-{{ go_arch }}.tar.gz"
+    dest: /usr/local
+    remote_src: true
+  when: go_download.changed
+
+- name: Symlink go and gofmt into /usr/local/bin
+  become: true
+  ansible.builtin.file:
+    src: "/usr/local/go/bin/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    state: link
+    force: true
+  loop:
+    - go
+    - gofmt

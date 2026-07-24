@@ -1,0 +1,9 @@
+---
+# state: latest so every run upgrades these to the newest version apt
+# offers, rather than leaving whatever first landed pinned.
+- name: Install apt packages
+  become: true
+  ansible.builtin.apt:
+    name: "{{ apt_packages }}"
+    state: latest
+    update_cache: true

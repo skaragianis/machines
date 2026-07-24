@@ -1,0 +1,56 @@
+---
+# These pnpm tasks run before chezmoi applies dotfiles and are invoked via
+# dev's fish login shell, so they must not depend on the ambient environment
+# (which may carry a stale/leaked PNPM_HOME). Each pins PNPM_HOME to the
+# Linux location. Persistent interactive PNPM_HOME is owned separately by
+# chezmoi (conf.d/path.fish); we don't write a dotfile. They run every play
+# (no install-once guard) so pnpm, Node LTS, and the global CLIs all track
+# the newest release.
+- name: Install/upgrade pnpm
+  ansible.builtin.shell:
+    cmd: |
+      export PNPM_HOME="$HOME/.local/share/pnpm"
+      curl -fsSL https://get.pnpm.io/install.sh | sh -
+    executable: /bin/bash
+  changed_when: true
+
+- name: Install/upgrade Node LTS via pnpm
+  ansible.builtin.shell:
+    cmd: |
+      export PNPM_HOME="$HOME/.local/share/pnpm"
+      export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
+      pnpm env use --global lts
+    executable: /bin/bash
+  changed_when: true
+
+- name: Install/upgrade global pnpm CLIs to latest
+  ansible.builtin.shell:
+    cmd: |
+      export PNPM_HOME="$HOME/.local/share/pnpm"
+      export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
+      pnpm add -g {{ item }}
+    executable: /bin/bash
+  loop:
+    - tree-sitter-cli
+    - "--allow-build=@anthropic-ai/claude-code @anthropic-ai/claude-code"
+    - "@openai/codex"
+    - playwright
+  changed_when: true
+
+# Chromium won't launch on a minimal Debian without a stack of shared
+# libraries (libnss3, libgbm, libasound2, ...). Playwright knows its own
+# dependency list per distro, so let it drive apt
+- name: Install Chromium system dependencies for Playwright
+  become: true
+  ansible.builtin.command:
+    cmd: "{{ pnpm_bin }}/playwright install-deps chromium"
+  environment:
+    PATH: "{{ pnpm_bin }}:{{ ansible_facts['env']['PATH'] }}"
+  changed_when: true
+
+- name: Install Chromium for Playwright
+  ansible.builtin.command:
+    cmd: "{{ pnpm_bin }}/playwright install chromium"
+  environment:
+    PATH: "{{ pnpm_bin }}:{{ ansible_facts['env']['PATH'] }}"
+  changed_when: true

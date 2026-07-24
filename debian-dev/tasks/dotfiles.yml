@@ -1,0 +1,46 @@
+---
+- name: Add github.com to dev's known_hosts
+  ansible.builtin.known_hosts:
+    name: github.com
+    key: "{{ lookup('ansible.builtin.pipe', 'ssh-keyscan -t ed25519 github.com') }}"
+    path: "/home/{{ debian_dev_user }}/.ssh/known_hosts"
+
+# No creates: guard — the installer fetches the latest chezmoi each run so
+# the binary tracks upstream (dotfiles themselves are pulled separately
+# below via chezmoi update).
+- name: Install/upgrade chezmoi to /usr/local/bin
+  become: true
+  ansible.builtin.shell:
+    cmd: "sh -c \"$(curl -fsLS get.chezmoi.io)\" -- -b /usr/local/bin"
+  changed_when: true
+
+- name: Clone the dotfiles source with chezmoi (first run only)
+  ansible.builtin.command:
+    cmd: "chezmoi init {{ dotfiles_repo }}"
+    # Check .git, not the source dir itself: a failed clone (e.g. the
+    # deploy key not on GitHub yet) still leaves the empty source dir
+    # behind, which previously made `creates` skip every re-run forever.
+    creates: "/home/{{ debian_dev_user }}/.local/share/chezmoi/.git"
+
+# Pull the latest dotfiles on every run so changes roll out without a manual
+# `chezmoi update` on the VM.
+- name: Pull latest dotfiles with chezmoi
+  ansible.builtin.command:
+    cmd: "chezmoi update --apply=false"
+  changed_when: true
+
+# Apply separately with --force. pnpm's installer appends a block to the
+# chezmoi-managed config.fish; without --force chezmoi tries to prompt about
+# that drift and dies on the TTY-less ansible connection. config.fish is
+# fully chezmoi-owned (path.fish provides PNPM_HOME), so discarding the
+# external edit is the correct outcome.
+- name: Apply dotfiles with chezmoi (force overwrites external drift)
+  ansible.builtin.command:
+    cmd: "chezmoi apply --force"
+  changed_when: true
+
+- name: Remaining manual steps
+  ansible.builtin.debug:
+    msg:
+      - "1. Add the SSH public key printed above to https://github.com/settings/keys"
+      - "2. If the chezmoi step above failed because that key wasn't added to GitHub yet, add it and re-run provision.yml"

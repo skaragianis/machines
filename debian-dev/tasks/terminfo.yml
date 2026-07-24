@@ -1,0 +1,30 @@
+---
+# --- Ghostty terminfo (generate on Mac, load on VM) ---
+- name: Generate ghostty terminfo on the control node
+  delegate_to: localhost
+  become: false
+  ansible.builtin.command:
+    cmd: infocmp -x xterm-ghostty
+  register: ghostty_terminfo
+  changed_when: false
+
+- name: Copy ghostty terminfo to the VM
+  ansible.builtin.copy:
+    content: "{{ ghostty_terminfo.stdout }}\n"
+    dest: "/home/{{ debian_dev_user }}/ghostty.terminfo"
+    owner: "{{ debian_dev_user }}"
+    group: "{{ debian_dev_user }}"
+    mode: "0644"
+
+- name: Check whether ghostty terminfo is already known
+  ansible.builtin.command:
+    cmd: infocmp xterm-ghostty
+  register: ghostty_check
+  changed_when: false
+  failed_when: false
+
+- name: Load ghostty terminfo
+  ansible.builtin.command:
+    cmd: "tic -x /home/{{ debian_dev_user }}/ghostty.terminfo"
+  when: ghostty_check.rc != 0
+  changed_when: true

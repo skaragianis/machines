@@ -1,0 +1,28 @@
+---
+- name: Install unattended-upgrades
+  become: true
+  ansible.builtin.apt:
+    name: unattended-upgrades
+    state: present
+    update_cache: true
+
+- name: Enable periodic apt updates and unattended upgrades
+  become: true
+  ansible.builtin.copy:
+    src: files/20auto-upgrades
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    mode: "0644"
+
+- name: Configure unattended-upgrades policy (security-only, no auto-reboot)
+  become: true
+  ansible.builtin.copy:
+    src: files/52unattended-upgrades-local
+    dest: /etc/apt/apt.conf.d/52unattended-upgrades-local
+    mode: "0644"
+
+- name: Enable and start the unattended-upgrades service
+  become: true
+  ansible.builtin.service:
+    name: unattended-upgrades
+    enabled: true
+    state: started

@@ -1,0 +1,13 @@
+---
+- name: Install/upgrade uv (astral.sh)
+  ansible.builtin.shell:
+    cmd: "curl -LsSf https://astral.sh/uv/install.sh | sh"
+  changed_when: true
+
+- name: Install/upgrade uv-managed tools to latest
+  ansible.builtin.command:
+    cmd: "/home/{{ debian_dev_user }}/.local/bin/uv tool install --force --reinstall {{ item }}@latest"
+  loop:
+    - ruff
+    - ty
+  changed_when: true

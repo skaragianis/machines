@@ -1,0 +1,7 @@
+---
+# become: true here because this play sets sudo per-task, not play-wide.
+- name: Restart ssh
+  become: true
+  ansible.builtin.service:
+    name: ssh
+    state: restarted
