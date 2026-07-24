@@ -9,6 +9,7 @@ debian_dev_user: dev
 dev_authorized_keys:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC5CUHJESCu51g4NqYtk9GDrD6hsZ6lkGoOrR1yZTEUB steffan.karagianis@gmail.com" # mac
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKDzZzVX1Q13Gs8W+c8MOnxg70gTl8jF8rh7dtF2p7Yw steffan.karagianis@gmail.com" # Kubuntu
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICeP2nqLtn8DDbpNqBR4uk5VD08LnCmZi0NW85ESn6p5 moshi"
 
 # Only slow-moving system packages stay on apt. Fast-moving developer tools
 # (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk, delta, difftastic,
