@@ -1,0 +1,27 @@
+---
+- name: Check whether Tailscale is already installed
+  ansible.builtin.stat:
+    path: /usr/bin/tailscale
+  register: tailscale_binary
+
+- name: Bootstrap the Tailscale apt repo with the upstream install script
+  become: true
+  ansible.builtin.shell:
+    cmd: set -o pipefail && curl -fsSL https://tailscale.com/install.sh | sh
+    executable: /bin/bash
+  when: not tailscale_binary.stat.exists
+  changed_when: true
+
+- name: Install Tailscale
+  become: true
+  ansible.builtin.apt:
+    name: tailscale
+    state: latest
+    update_cache: true
+
+- name: Enable and start tailscaled
+  become: true
+  ansible.builtin.systemd_service:
+    name: tailscaled
+    enabled: true
+    state: started

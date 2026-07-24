@@ -1,0 +1,7 @@
+---
+# This is a personal dev box that is meant to track upstream: every run should
+# pull the newest version apt offers rather than pinning whatever landed first.
+# `state: latest` is the deliberate choice here, so the idempotency rule that
+# forbids it does not apply.
+skip_list:
+  - package-latest

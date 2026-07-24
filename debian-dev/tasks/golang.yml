@@ -34,15 +34,17 @@
   register: go_download
 
 # Per go.dev's install docs: wipe the old tree before extracting so removed
-# files don't linger across upgrades.
-- name: Remove previous Go installation
+# files don't linger across upgrades. Not handlers (despite gating on
+# `changed`): handlers only fire at the end of the play, and the symlink task
+# below needs the new tree already in place.
+- name: Remove previous Go installation  # noqa: no-handler
   become: true
   ansible.builtin.file:
     path: /usr/local/go
     state: absent
   when: go_download.changed
 
-- name: Extract Go to /usr/local
+- name: Extract Go to /usr/local  # noqa: no-handler
   become: true
   ansible.builtin.unarchive:
     src: "/opt/{{ go_version }}.linux-{{ go_arch }}.tar.gz"

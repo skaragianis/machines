@@ -16,23 +16,43 @@
     - name: Reset SSH connection so new sudo group membership takes effect
       ansible.builtin.meta: reset_connection
 
-    - import_tasks: tasks/ssh_keys.yml
-    - import_tasks: tasks/ssh_hardening.yml
-    - import_tasks: tasks/firewall.yml
-    - import_tasks: tasks/apt_packages.yml
-    - import_tasks: tasks/unattended_upgrades.yml
-    - import_tasks: tasks/golang.yml
-    - import_tasks: tasks/github_tools.yml
-    - import_tasks: tasks/github_cli.yml
-    - import_tasks: tasks/docker.yml
-    - import_tasks: tasks/fish.yml
-    - import_tasks: tasks/task_runner.yml
-    - import_tasks: tasks/python_tools.yml
-    - import_tasks: tasks/rust.yml
-    - import_tasks: tasks/terminfo.yml
-    - import_tasks: tasks/dev_ssh_key.yml
-    - import_tasks: tasks/node.yml
-    - import_tasks: tasks/dotfiles.yml
+    - name: Install authorized SSH keys
+      ansible.builtin.import_tasks: tasks/ssh_keys.yml
+    - name: Harden the SSH daemon
+      ansible.builtin.import_tasks: tasks/ssh_hardening.yml
+    - name: Configure the firewall
+      ansible.builtin.import_tasks: tasks/firewall.yml
+    - name: Install apt packages
+      ansible.builtin.import_tasks: tasks/apt_packages.yml
+    - name: Configure unattended upgrades
+      ansible.builtin.import_tasks: tasks/unattended_upgrades.yml
+    - name: Install Tailscale
+      ansible.builtin.import_tasks: tasks/tailscale.yml
+    - name: Install the Go toolchain
+      ansible.builtin.import_tasks: tasks/golang.yml
+    - name: Install tools from GitHub releases
+      ansible.builtin.import_tasks: tasks/github_tools.yml
+    - name: Install the GitHub CLI
+      ansible.builtin.import_tasks: tasks/github_cli.yml
+    - name: Install Docker
+      ansible.builtin.import_tasks: tasks/docker.yml
+    - name: Install and configure fish
+      ansible.builtin.import_tasks: tasks/fish.yml
+    - name: Install the Task runner
+      ansible.builtin.import_tasks: tasks/task_runner.yml
+    - name: Install Python tooling
+      ansible.builtin.import_tasks: tasks/python_tools.yml
+    - name: Install the Rust toolchain
+      ansible.builtin.import_tasks: tasks/rust.yml
+    - name: Install terminfo entries
+      ansible.builtin.import_tasks: tasks/terminfo.yml
+    - name: Create dev's SSH key
+      ansible.builtin.import_tasks: tasks/dev_ssh_key.yml
+    - name: Install Node and pnpm tooling
+      ansible.builtin.import_tasks: tasks/node.yml
+    - name: Apply dotfiles
+      ansible.builtin.import_tasks: tasks/dotfiles.yml
 
   handlers:
-    - import_tasks: handlers/restart_ssh.yml
+    - name: SSH restart handler
+      ansible.builtin.import_tasks: handlers/restart_ssh.yml

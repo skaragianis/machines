@@ -1,7 +1,8 @@
 ---
-- name: Install/upgrade uv (astral.sh)
+- name: Install/upgrade uv (astral.sh)  # noqa: command-instead-of-module
   ansible.builtin.shell:
-    cmd: "curl -LsSf https://astral.sh/uv/install.sh | sh"
+    cmd: set -o pipefail && curl -LsSf https://astral.sh/uv/install.sh | sh
+    executable: /bin/bash
   changed_when: true
 
 - name: Install/upgrade uv-managed tools to latest

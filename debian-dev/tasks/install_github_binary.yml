@@ -12,7 +12,7 @@
 # Most projects ship a tarball/zip; those that publish a bare executable as the
 # release asset (e.g. jq) set `archive: false` and are downloaded straight to
 # their final path instead of being extracted.
-- name: "{{ tool.name }}: resolve latest release tag"
+- name: "Resolve latest release tag for {{ tool.name }}"
   ansible.builtin.uri:
     url: "https://api.github.com/repos/{{ tool.repo }}/releases/latest"
     headers:
@@ -20,14 +20,14 @@
   register: gh_release
   when: tool.tag is not defined
 
-- name: "{{ tool.name }}: pin the release tag"
+- name: "Pin the release tag for {{ tool.name }}"
   ansible.builtin.set_fact:
     gh_tag: "{{ tool.tag if tool.tag is defined else gh_release.json.tag_name }}"
 
 # Expand the {version}/{target} placeholders in the asset/subdir templates now
 # that the tag is known. {version} drops any leading "v"; {target} maps this
 # host's architecture to the project's release-target string.
-- name: "{{ tool.name }}: compute release facts"
+- name: "Compute release facts for {{ tool.name }}"
   ansible.builtin.set_fact:
     gh_asset: >-
       {{ tool.asset
@@ -39,7 +39,7 @@
          | replace('{target}', tool.target[ansible_facts['architecture']]) }}
     gh_archive: "{{ tool.archive | default(true) | bool }}"
 
-- name: "{{ tool.name }}: create extraction directory"
+- name: "Create the extraction directory for {{ tool.name }}"
   become: true
   ansible.builtin.file:
     path: "/opt/{{ tool.name }}"
@@ -48,7 +48,7 @@
 
 # A bare-binary asset is its own artifact, so it lands executable (0755) and is
 # never extracted; an archive stays 0644 and is unpacked in the next task.
-- name: "{{ tool.name }}: download latest release asset"
+- name: "Download the latest release asset for {{ tool.name }}"
   become: true
   ansible.builtin.get_url:
     url: "https://github.com/{{ tool.repo }}/releases/download/{{ gh_tag }}/{{ gh_asset }}"
@@ -57,7 +57,7 @@
     force: true
   register: gh_download
 
-- name: "{{ tool.name }}: extract release asset"
+- name: "Extract the release asset for {{ tool.name }}"
   become: true
   ansible.builtin.unarchive:
     src: "/opt/{{ tool.name }}/{{ gh_asset }}"
@@ -68,7 +68,7 @@
 # For an archive the symlink target is <subdir>/<bin> inside the extracted tree;
 # for a bare binary the downloaded asset itself is the target, and `bins` just
 # names the command it's exposed as (jq-linux-arm64 -> /usr/local/bin/jq).
-- name: "{{ tool.name }}: symlink binaries into /usr/local/bin"
+- name: "Symlink binaries into /usr/local/bin for {{ tool.name }}"
   become: true
   ansible.builtin.file:
     src: "/opt/{{ tool.name }}/{{ (gh_subdir ~ '/') if gh_subdir else '' }}{{ item if gh_archive else gh_asset }}"

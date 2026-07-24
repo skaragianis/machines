@@ -2,7 +2,7 @@
 - name: Bootstrap debian dev base setup (root via su)
   hosts: debian_dev
   become: true
-  become_method: su
+  become_method: ansible.builtin.su
   gather_facts: true
   vars_prompt:
     - name: machine_ip
@@ -57,4 +57,5 @@
       notify: Restart ssh
 
   handlers:
-    - import_tasks: handlers/restart_ssh.yml
+    - name: SSH restart handler
+      ansible.builtin.import_tasks: handlers/restart_ssh.yml

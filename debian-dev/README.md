@@ -38,7 +38,8 @@ Prompts only for `dev`'s sudo password. Idempotent — safe to run repeatedly.
 
 1. Add the printed GitHub public key at <https://github.com/settings/keys>.
 2. If the chezmoi init/apply task failed because that key wasn't on GitHub yet, re-run `provision.yml` once it's added.
-3. (Optional) In VS Code install **Open Remote - SSH** and connect to the host.
+3. Join the tailnet: `ssh dev@<machine-ip> sudo tailscale up`, then follow the printed auth URL. Provisioning installs and starts Tailscale but never authenticates it — no auth key lives in this repo. Only needed once; re-runs leave the existing login alone.
+4. (Optional) In VS Code install **Open Remote - SSH** and connect to the host.
 
 ## SSH access
 

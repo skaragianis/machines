@@ -15,16 +15,24 @@
     port: ssh
     proto: tcp
 
-- name: Default-deny incoming, allow outgoing
+- name: Allow inbound traffic arriving over the tailnet
   become: true
   community.general.ufw:
-    direction: "{{ item.direction }}"
-    policy: "{{ item.policy }}"
-  loop:
-    - { direction: incoming, policy: deny }
-    - { direction: outgoing, policy: allow }
-  loop_control:
-    label: "{{ item.direction }} {{ item.policy }}"
+    rule: allow
+    direction: in
+    interface: tailscale0
+
+- name: Default-deny incoming traffic
+  become: true
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+
+- name: Default-allow outgoing traffic
+  become: true
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
 
 - name: Enable the firewall
   become: true
