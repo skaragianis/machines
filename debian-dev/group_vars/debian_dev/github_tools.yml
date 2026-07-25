@@ -10,6 +10,8 @@
 # ("" when they sit at the root); `bins` are the binaries under `subdir` to
 # symlink into /usr/local/bin. `tag` pins a fixed rolling release (e.g. Neovim's
 # "stable") instead of resolving the newest tag via the GitHub API.
+# `aliases` are extra command names symlinked to the first entry in `bins`, for
+# projects whose upstream installer creates them (e.g. bunx -> bun).
 github_release_tools:
   - name: neovim
     repo: neovim/neovim
@@ -92,3 +94,10 @@ github_release_tools:
     asset: "pi-linux-{target}.tar.gz"
     subdir: "pi"
     bins: [pi]
+  - name: bun
+    repo: oven-sh/bun
+    target: { x86_64: x64, aarch64: aarch64 }
+    asset: "bun-linux-{target}.zip"
+    subdir: "bun-linux-{target}"
+    bins: [bun]
+    aliases: [bunx]

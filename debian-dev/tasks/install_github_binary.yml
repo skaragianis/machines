@@ -76,3 +76,15 @@
     state: link
     force: true
   loop: "{{ tool.bins }}"
+
+# Some tools are invoked under a second name that the archive doesn't contain
+# because upstream's own installer symlinks it (bunx -> bun). Point those at the
+# first binary in `bins`.
+- name: "Symlink command aliases into /usr/local/bin for {{ tool.name }}"
+  become: true
+  ansible.builtin.file:
+    src: "/usr/local/bin/{{ tool.bins[0] }}"
+    dest: "/usr/local/bin/{{ item }}"
+    state: link
+    force: true
+  loop: "{{ tool.aliases | default([]) }}"
