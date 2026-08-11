@@ -33,6 +33,8 @@
     executable: /bin/bash
   loop:
     - tree-sitter-cli
+    - prettier
+    - markdownlint-cli2
     - "--allow-build=@anthropic-ai/claude-code @anthropic-ai/claude-code"
     - "@openai/codex"
     - playwright
