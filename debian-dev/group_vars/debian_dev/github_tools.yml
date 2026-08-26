@@ -101,3 +101,16 @@ github_release_tools:
     subdir: "bun-linux-{target}"
     bins: [bun]
     aliases: [bunx]
+  - name: floci
+    repo: floci-io/floci-cli
+    archive: false
+    target: { x86_64: amd64, aarch64: arm64 }
+    asset: "floci-linux-{target}"
+    subdir: ""
+    bins: [floci]
+  - name: opentofu
+    repo: opentofu/opentofu
+    target: { x86_64: amd64, aarch64: arm64 }
+    asset: "tofu_{version}_linux_{target}.zip"
+    subdir: ""
+    bins: [tofu]
