@@ -36,6 +36,8 @@
       ansible.builtin.import_tasks: tasks/github_cli.yml
     - name: Install Docker
       ansible.builtin.import_tasks: tasks/docker.yml
+    - name: Install the PostgreSQL client
+      ansible.builtin.import_tasks: tasks/postgresql.yml
     - name: Install and configure fish
       ansible.builtin.import_tasks: tasks/fish.yml
     - name: Install the Task runner
