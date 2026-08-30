@@ -28,6 +28,7 @@ apt_packages:
   - libtree-sitter-dev
   - sqlite3
   - tmux
+  - tree
   - unzip
   - wget
   - zip

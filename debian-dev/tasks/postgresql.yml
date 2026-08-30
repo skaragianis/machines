@@ -1,6 +1,6 @@
 ---
 # Debian's postgresql-client lags well behind upstream, so install from the
-# official PGDG apt repo instead. 
+# official PGDG apt repo instead.
 - name: Ensure /etc/apt/keyrings exists
   become: true
   ansible.builtin.file:
