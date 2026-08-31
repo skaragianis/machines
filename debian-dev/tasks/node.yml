@@ -36,6 +36,7 @@
     - prettier
     - markdownlint-cli2
     - typescript
+    - sql-formatter
     - "--allow-build=@anthropic-ai/claude-code @anthropic-ai/claude-code"
     - "@openai/codex"
     - playwright
