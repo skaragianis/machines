@@ -37,5 +37,5 @@ pnpm_home: "/home/{{ debian_dev_user }}/.local/share/pnpm"
 pnpm_bin: "{{ pnpm_home }}/bin"
 fish_path: /usr/bin/fish
 github_key_comment: debian-dev
-node_version: lts-latest
+node_version: "26"
 dotfiles_repo: git@github.com:skaragianis/dotfiles.git

@@ -4,8 +4,9 @@
 # (which may carry a stale/leaked PNPM_HOME). Each pins PNPM_HOME to the
 # Linux location. Persistent interactive PNPM_HOME is owned separately by
 # chezmoi (conf.d/path.fish); we don't write a dotfile. They run every play
-# (no install-once guard) so pnpm, Node LTS, and the global CLIs all track
-# the newest release.
+# (no install-once guard) so pnpm and the global CLIs track the newest
+# release; Node is pinned to the node_version major (see group_vars) and
+# tracks the newest release within it.
 - name: Install/upgrade pnpm
   ansible.builtin.shell:
     cmd: |
@@ -15,12 +16,12 @@
     executable: /bin/bash
   changed_when: true
 
-- name: Install/upgrade Node LTS via pnpm
+- name: Install/upgrade Node via pnpm to major {{ node_version }}
   ansible.builtin.shell:
     cmd: |
       export PNPM_HOME="$HOME/.local/share/pnpm"
       export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
-      pnpm env use --global lts
+      pnpm env use --global {{ node_version }}
     executable: /bin/bash
   changed_when: true
 
