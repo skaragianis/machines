@@ -1,0 +1,13 @@
+---
+# fish picks its PATH up from chezmoi's conf.d/path.fish; bash reads none of
+# that. Codex drives the box through `bash -lc`, so without this it cannot see
+# pnpm, cargo, uv or go-installed binaries. See the file itself for the reasons
+# behind /etc/profile.d and the exact entries.
+- name: Install the bash PATH profile for non-fish shells
+  become: true
+  ansible.builtin.copy:
+    src: files/dev-path.sh
+    dest: /etc/profile.d/dev-path.sh
+    owner: root
+    group: root
+    mode: "0644"

@@ -114,3 +114,9 @@ github_release_tools:
     asset: "tofu_{version}_linux_{target}.zip"
     subdir: ""
     bins: [tofu]
+  - name: rtk
+    repo: rtk-ai/rtk
+    target: { x86_64: x86_64-unknown-linux-musl, aarch64: aarch64-unknown-linux-gnu }
+    asset: "rtk-{target}.tar.gz"
+    subdir: ""
+    bins: [rtk]

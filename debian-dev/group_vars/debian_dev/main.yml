@@ -13,7 +13,7 @@ dev_authorized_keys:
 
 # Only slow-moving system packages stay on apt. Fast-moving developer tools
 # (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk, delta, difftastic,
-# herdr, pi, bun, floci) are installed
+# herdr, pi, bun, floci, rtk) are installed
 # directly from upstream so every run tracks the latest release. See
 # github_release_tools
 apt_packages:

@@ -52,6 +52,8 @@
       ansible.builtin.import_tasks: tasks/dev_ssh_key.yml
     - name: Install Node and pnpm tooling
       ansible.builtin.import_tasks: tasks/node.yml
+    - name: Configure the bash PATH for non-fish shells
+      ansible.builtin.import_tasks: tasks/bash_path.yml
     - name: Apply dotfiles
       ansible.builtin.import_tasks: tasks/dotfiles.yml
 
