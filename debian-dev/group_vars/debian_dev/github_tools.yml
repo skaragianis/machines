@@ -78,7 +78,7 @@ github_release_tools:
   - name: difftastic
     repo: Wilfred/difftastic
     target: { x86_64: x86_64-unknown-linux-gnu, aarch64: aarch64-unknown-linux-gnu }
-    asset: "difft-{target}.tar.gz"
+    asset: "difft-{version}-{target}.tar.gz"
     subdir: ""
     bins: [difft]
   - name: herdr
