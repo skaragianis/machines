@@ -72,10 +72,12 @@
 # For an archive the symlink target is <subdir>/<bin> inside the extracted tree;
 # for a bare binary the downloaded asset itself is the target, and `bins` just
 # names the command it's exposed as (jq-linux-arm64 -> /usr/local/bin/jq).
+# An archive whose binary carries a version in its filename sets `binary`
+# (with a `{tag}` placeholder) for the on-disk name; `bins[0]` is the command.
 - name: "Symlink binaries into /usr/local/bin for {{ tool.name }}"
   become: true
   ansible.builtin.file:
-    src: "/opt/{{ tool.name }}/{{ (gh_subdir ~ '/') if gh_subdir else '' }}{{ item if gh_archive else gh_asset }}"
+    src: "/opt/{{ tool.name }}/{{ (gh_subdir ~ '/') if gh_subdir else '' }}{{ (tool.binary | default(item) | replace('{tag}', gh_tag)) if gh_archive else gh_asset }}"
     dest: "/usr/local/bin/{{ item }}"
     state: link
     force: true

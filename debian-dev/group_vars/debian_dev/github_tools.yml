@@ -12,6 +12,8 @@
 # "stable") instead of resolving the newest tag via the GitHub API.
 # `aliases` are extra command names symlinked to the first entry in `bins`, for
 # projects whose upstream installer creates them (e.g. bunx -> bun).
+# `binary` is the on-disk name when it differs from the command (`{tag}` is the
+# release tag), e.g. render's zip holds `cli_v2.28.0`, exposed as `render`.
 github_release_tools:
   - name: neovim
     repo: neovim/neovim
@@ -120,3 +122,10 @@ github_release_tools:
     asset: "rtk-{target}.tar.gz"
     subdir: ""
     bins: [rtk]
+  - name: render
+    repo: render-oss/cli
+    target: { x86_64: amd64, aarch64: arm64 }
+    asset: "cli_{version}_linux_{target}.zip"
+    subdir: ""
+    binary: "cli_{tag}"
+    bins: [render]
