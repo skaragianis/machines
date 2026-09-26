@@ -56,6 +56,8 @@
       ansible.builtin.import_tasks: tasks/bash_path.yml
     - name: Apply dotfiles
       ansible.builtin.import_tasks: tasks/dotfiles.yml
+    - name: Summarise installed tools
+      ansible.builtin.import_tasks: tasks/summary.yml
 
   handlers:
     - name: SSH restart handler

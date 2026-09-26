@@ -39,3 +39,46 @@ fish_path: /usr/bin/fish
 github_key_comment: debian-dev
 node_version: "26"
 dotfiles_repo: git@github.com:skaragianis/dotfiles.git
+
+# Version commands for the end-of-run summary (tasks/summary.yml). `name` is the
+# label, `cmd` is run through bash with dev's PATH and its first output line is
+# shown.
+summary_tools:
+  - { name: go, cmd: go version }
+  - { name: rustc, cmd: rustc --version }
+  - { name: cargo, cmd: cargo --version }
+  - { name: node, cmd: node --version }
+  - { name: pnpm, cmd: pnpm --version }
+  - { name: bun, cmd: bun --version }
+  - { name: uv, cmd: uv --version }
+  - { name: ruff, cmd: ruff --version }
+  - { name: ty, cmd: ty --version }
+  - { name: docker, cmd: docker --version }
+  - { name: gh, cmd: gh --version }
+  - { name: psql, cmd: psql --version }
+  - { name: tailscale, cmd: tailscale version }
+  - { name: task, cmd: task --version }
+  - { name: opentofu, cmd: tofu version }
+  - { name: render, cmd: render --version }
+  - { name: neovim, cmd: nvim --version }
+  - { name: yazi, cmd: yazi --version }
+  - { name: fzf, cmd: fzf --version }
+  - { name: lazygit, cmd: lazygit --version }
+  - { name: ripgrep, cmd: rg --version }
+  - { name: fd, cmd: fd --version }
+  - { name: zoxide, cmd: zoxide --version }
+  - { name: jq, cmd: jq --version }
+  - { name: hunk, cmd: hunk --version }
+  - { name: delta, cmd: delta --version }
+  - { name: difftastic, cmd: difft --version }
+  - { name: herdr, cmd: herdr --version }
+  - { name: floci, cmd: floci --version }
+  - { name: rtk, cmd: rtk --version }
+  - { name: pi, cmd: pi --version }
+  - { name: claude, cmd: claude --version }
+  - { name: codex, cmd: codex --version }
+  - { name: playwright, cmd: playwright --version }
+  - { name: prettier, cmd: prettier --version }
+  - { name: typescript, cmd: tsc --version }
+  - { name: fish, cmd: fish --version }
+  - { name: tmux, cmd: tmux -V }

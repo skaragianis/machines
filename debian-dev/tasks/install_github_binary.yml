@@ -2,7 +2,7 @@
 # Included once per entry in github_release_tools (loop_var: tool). Resolves the
 # latest release tag from the GitHub API, downloads that release's asset,
 # extracts it under /opt/<name>/, and symlinks the binaries into
-# /usr/local/bin. 
+# /usr/local/bin.
 - name: "Resolve latest release tag for {{ tool.name }}"
   ansible.builtin.uri:
     url: "https://api.github.com/repos/{{ tool.repo }}/releases/latest"
@@ -77,11 +77,16 @@
 - name: "Symlink binaries into /usr/local/bin for {{ tool.name }}"
   become: true
   ansible.builtin.file:
-    src: "/opt/{{ tool.name }}/{{ (gh_subdir ~ '/') if gh_subdir else '' }}{{ (tool.binary | default(item) | replace('{tag}', gh_tag)) if gh_archive else gh_asset }}"
+    src: "/opt/{{ tool.name }}/{{ gh_link_dir }}{{ gh_link_file }}"
     dest: "/usr/local/bin/{{ item }}"
     state: link
     force: true
   loop: "{{ tool.bins }}"
+  vars:
+    gh_link_dir: "{{ (gh_subdir ~ '/') if gh_subdir else '' }}"
+    gh_link_file: >-
+      {{ (tool.binary | default(item) | replace('{tag}', gh_tag))
+         if gh_archive else gh_asset }}
 
 # Some tools are invoked under a second name that the archive doesn't contain
 # because upstream's own installer symlinks it (bunx -> bun). Point those at the

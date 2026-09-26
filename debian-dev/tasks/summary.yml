@@ -1,0 +1,30 @@
+---
+# Final report of what is actually on the box. Runs last and never fails the
+# play: a tool that isn't on PATH, or whose version command errors, shows as
+# MISSING. BASH_ENV sources /etc/profile.d/dev-path.sh, so the lookup uses the
+# same PATH codex sees. Output is captured whole and trimmed to its first line
+# in bash, not piped through head, so a command's own exit status is kept.
+- name: Collect installed tool versions
+  ansible.builtin.shell:
+    cmd: |
+      report() {
+        name="$1"; shift
+        if command -v "$1" >/dev/null 2>&1 && out=$("$@" 2>&1) && [ -n "$out" ]; then
+          printf '%-12s %s\n' "$name" "${out%%$'\n'*}"
+        else
+          printf '%-12s MISSING\n' "$name"
+        fi
+      }
+      {% for tool in summary_tools | sort(attribute='name') %}
+      report {{ tool.name }} {{ tool.cmd }}
+      {% endfor %}
+    executable: /bin/bash
+  environment:
+    BASH_ENV: /etc/profile.d/dev-path.sh
+  register: tool_summary
+  changed_when: false
+  failed_when: false
+
+- name: Show installed tool versions
+  ansible.builtin.debug:
+    msg: "{{ ['Installed tools:'] + tool_summary.stdout_lines }}"

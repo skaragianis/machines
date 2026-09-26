@@ -9,4 +9,3 @@
   loop_control:
     loop_var: tool
     label: "{{ tool.name }}"
-  ignore_errors: true
