@@ -129,3 +129,9 @@ github_release_tools:
     subdir: ""
     binary: "cli_{tag}"
     bins: [render]
+  - name: tuxedo
+    repo: webstonehq/tuxedo
+    target: { x86_64: x86_64-unknown-linux-gnu, aarch64: aarch64-unknown-linux-gnu }
+    asset: "tuxedo-v{version}-{target}.tar.gz"
+    subdir: "tuxedo-v{version}-{target}"
+    bins: [tuxedo]

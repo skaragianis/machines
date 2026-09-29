@@ -39,7 +39,8 @@ Prompts only for `dev`'s sudo password. Idempotent — safe to run repeatedly.
 1. Add the printed GitHub public key at <https://github.com/settings/keys>.
 2. If the chezmoi init/apply task failed because that key wasn't on GitHub yet, re-run `provision.yml` once it's added.
 3. Join the tailnet: `ssh dev@<machine-ip> sudo tailscale up`, then follow the printed auth URL. Provisioning installs and starts Tailscale but never authenticates it — no auth key lives in this repo. Only needed once; re-runs leave the existing login alone.
-4. (Optional) In VS Code install **Open Remote - SSH** and connect to the host.
+4. Accept the Syncthing device on your other devices — see [Syncthing](#syncthing).
+5. (Optional) In VS Code install **Open Remote - SSH** and connect to the host.
 
 ## SSH access
 
@@ -58,6 +59,30 @@ To grant another machine (e.g. the Ubuntu laptop) SSH access:
 
 The new machine only needs an SSH client; it doesn't need Ansible. Playbooks are
 still run from the Mac.
+
+## Syncthing
+
+Syncthing runs as `dev` and shares the Sync folder (folder ID `default`,
+`~/Sync`) with the devices in `syncthing_peers` (`group_vars/debian_dev/main.yml`).
+Its ignore patterns (`!/Todo`, then `*`) mean **only `~/Sync/Todo`** is ever
+downloaded or sent. The other devices still send the server the list of files in
+the whole folder (names, sizes, dates), but no file contents. The ignore file is
+written before the folder is added and re-applied on every run.
+
+Any other folder or device in the server's config is deleted on every run.
+The server never accepts folders automatically, and no device can introduce
+others to it. Peers are dialled at tailnet addresses. Global discovery, relays,
+NAT traversal and LAN discovery are off, and the firewall only admits tailnet
+traffic. The device key and API key are generated on the host and never leave it.
+
+The GUI listens on loopback only. To open it, tunnel:
+`ssh -L 8385:127.0.0.1:8384 dev@<host>`, then browse to <http://127.0.0.1:8385>.
+
+Nothing changes on the other devices beyond accepting the server. On each peer,
+add the server's device ID (printed at the end of the run) with address
+`tcp://<server-tailnet-ip>:22000`, then share the Sync folder with it.
+
+To add a peer, add its ID and tailnet address to `syncthing_peers` and re-run.
 
 ## Dotfiles
 

@@ -44,3 +44,6 @@
     msg:
       - "1. Add the SSH public key printed above to https://github.com/settings/keys"
       - "2. If the chezmoi step above failed because that key wasn't added to GitHub yet, add it and re-run provision.yml"
+      - "3. On each Syncthing peer, add device {{ syncthing_my_id }} at {{ syncthing_address }} and share the Default Folder with it"
+  vars:
+    syncthing_address: "tcp://{{ ansible_facts['tailscale0']['ipv4']['address'] | default('<tailnet-ip>') }}:22000"

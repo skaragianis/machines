@@ -13,7 +13,7 @@ dev_authorized_keys:
 
 # Only slow-moving system packages stay on apt. Fast-moving developer tools
 # (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk, delta, difftastic,
-# herdr, pi, bun, floci, rtk) are installed
+# herdr, pi, bun, floci, rtk, tuxedo) are installed
 # directly from upstream so every run tracks the latest release. See
 # github_release_tools
 apt_packages:
@@ -40,6 +40,31 @@ github_key_comment: debian-dev
 node_version: "26"
 dotfiles_repo: git@github.com:skaragianis/dotfiles.git
 
+# Syncthing (tasks/syncthing.yml). Only syncthing_folder is synced to this box,
+# and only with these peers; anything else found in its config is removed.
+# It is the peers' whole Sync folder (ID "default"), but the ignore patterns
+# (first match wins) mean only Todo is ever transferred.
+# Device IDs are public identifiers, not secrets. Addresses are tailnet IPs.
+syncthing_api: http://127.0.0.1:8384
+syncthing_folder:
+  id: default
+  label: Default Folder
+  path: "/home/{{ debian_dev_user }}/Sync"
+  type: sendreceive
+  ignores:
+    - "!/Todo"
+    - "*"
+syncthing_peers:
+  - name: air
+    id: YEX2Y6R-JWFU46R-ZYUWTB3-5UJKRSF-5IXH647-KBVP5CM-LKVQEDE-URWOQAH
+    address: tcp://100.118.124.127:22000
+  - name: thinkpad
+    id: VFFJV6G-DIKPTHT-UEKY33M-W42R4BC-DTA4QS7-EKXE2R6-KNDRNOL-FI2Y5QY
+    address: tcp://100.93.52.110:22000
+  - name: phone
+    id: RIMLLBT-KUOSUYG-D2ZW2IK-PJ2TAGZ-4UZN6IO-IGG2VUR-IRIWRPG-77NJAQ2
+    address: tcp://100.88.153.40:22000
+
 # Version commands for the end-of-run summary (tasks/summary.yml). `name` is the
 # label, `cmd` is run through bash with dev's PATH and its first output line is
 # shown.
@@ -57,6 +82,7 @@ summary_tools:
   - { name: gh, cmd: gh --version }
   - { name: psql, cmd: psql --version }
   - { name: tailscale, cmd: tailscale version }
+  - { name: syncthing, cmd: syncthing --version }
   - { name: task, cmd: task --version }
   - { name: opentofu, cmd: tofu version }
   - { name: render, cmd: render --version }
@@ -82,3 +108,4 @@ summary_tools:
   - { name: typescript, cmd: tsc --version }
   - { name: fish, cmd: fish --version }
   - { name: tmux, cmd: tmux -V }
+  - { name: tuxedo, cmd: tuxedo --version }

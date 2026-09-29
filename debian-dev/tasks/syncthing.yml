@@ -1,0 +1,265 @@
+---
+# Syncthing runs as dev and shares exactly one folder (syncthing_folder) with
+# the peers in syncthing_peers, reached only over the tailnet. Like
+# dev_authorized_keys, those two variables are the single source of truth:
+# any other folder or device found in the running config is deleted on every
+# run, so nothing on the other devices can reach this box by being shared or
+# introduced to it.
+#
+# The shared folder is the peers' whole ~/Sync, but syncthing_folder.ignores
+# (!/Todo then *) means only Todo is ever downloaded or sent. Peers still send
+# this box the index of the whole folder (names, sizes, mtimes — no content).
+# The ignore file is written before the folder is added so the first pull can
+# never fetch anything else, and it is re-asserted on every run.
+#
+# Nothing secret lives in this repo. The device key pair and the REST API key
+# are generated on the host on first start, and the API key is read back from
+# the host's config.xml at run time. Device IDs are public identifiers; a peer
+# still has to accept this device before anything syncs.
+
+- name: Ensure /etc/apt/keyrings exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Download Syncthing apt keyring
+  become: true
+  ansible.builtin.get_url:
+    url: https://syncthing.net/release-key.gpg
+    dest: /etc/apt/keyrings/syncthing-archive-keyring.gpg
+    mode: "0644"
+
+- name: Add Syncthing apt repository
+  become: true
+  ansible.builtin.deb822_repository:
+    name: syncthing
+    types: deb
+    uris: https://apt.syncthing.net/
+    suites: syncthing
+    components: stable-v2
+    signed_by: /etc/apt/keyrings/syncthing-archive-keyring.gpg
+    state: present
+
+- name: Install Syncthing
+  become: true
+  ansible.builtin.apt:
+    name: syncthing
+    state: latest
+    update_cache: true
+
+# Must be in place before the first start: without it Syncthing creates its
+# own "Default Folder" at ~/Sync with no ignore patterns. The folder is added
+# below instead, once .stignore is in place. apt manages upgrades, so the
+# built-in upgrader is off too.
+- name: Create the syncthing@ drop-in directory
+  become: true
+  ansible.builtin.file:
+    path: "/etc/systemd/system/syncthing@{{ debian_dev_user }}.service.d"
+    state: directory
+    mode: "0755"
+
+- name: Stop Syncthing creating a default folder or upgrading itself
+  become: true
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/syncthing@{{ debian_dev_user }}.service.d/override.conf"
+    content: |
+      [Service]
+      Environment=STNODEFAULTFOLDER=1
+      Environment=STNOUPGRADE=1
+    mode: "0644"
+  register: syncthing_dropin
+
+- name: Enable and start Syncthing for dev
+  become: true
+  ansible.builtin.systemd_service:
+    name: "syncthing@{{ debian_dev_user }}"
+    enabled: true
+    state: "{{ 'restarted' if syncthing_dropin is changed else 'started' }}"
+    daemon_reload: "{{ syncthing_dropin is changed }}"
+
+- name: Ensure the synced folder exists
+  ansible.builtin.file:
+    path: "{{ syncthing_folder.path }}"
+    state: directory
+    mode: "0700"
+
+- name: Write the folder's ignore patterns
+  ansible.builtin.copy:
+    dest: "{{ syncthing_folder.path }}/.stignore"
+    content: "{{ syncthing_folder.ignores | join('\n') }}\n"
+    mode: "0600"
+
+- name: Locate Syncthing's config file
+  ansible.builtin.command: syncthing paths
+  register: syncthing_paths
+  changed_when: false
+
+- name: Set the Syncthing config path
+  ansible.builtin.set_fact:
+    syncthing_config_file: "{{ syncthing_paths.stdout_lines[syncthing_paths.stdout_lines.index('Configuration file:') + 1] | trim }}"
+
+- name: Wait for Syncthing to write its config
+  ansible.builtin.wait_for:
+    path: "{{ syncthing_config_file }}"
+    search_regex: "<apikey>"
+    timeout: 60
+
+- name: Read Syncthing's config
+  ansible.builtin.slurp:
+    src: "{{ syncthing_config_file }}"
+  register: syncthing_config_xml
+  no_log: true
+
+- name: Extract the REST API key
+  ansible.builtin.set_fact:
+    syncthing_api_key: "{{ (syncthing_config_xml.content | b64decode | regex_search('<apikey>([^<]+)</apikey>', '\\1'))[0] }}"
+  no_log: true
+
+- name: Wait for the Syncthing API
+  ansible.builtin.uri:
+    url: "{{ syncthing_api }}/rest/noauth/health"
+  register: syncthing_health
+  until: syncthing_health.status == 200
+  retries: 30
+  delay: 2
+
+- name: Read this device's ID
+  ansible.builtin.uri:
+    url: "{{ syncthing_api }}/rest/system/status"
+    headers: { X-API-Key: "{{ syncthing_api_key }}" }
+  register: syncthing_status
+
+- name: Read the running Syncthing config
+  ansible.builtin.uri:
+    url: "{{ syncthing_api }}/rest/config"
+    headers: { X-API-Key: "{{ syncthing_api_key }}" }
+  register: syncthing_config
+
+- name: Set Syncthing facts
+  ansible.builtin.set_fact:
+    syncthing_my_id: "{{ syncthing_status.json.myID }}"
+    syncthing_peer_ids: "{{ syncthing_peers | map(attribute='id') | list }}"
+
+# Peers are dialled at their tailnet addresses, so global discovery, relays,
+# NAT traversal and LAN broadcasts are all switched off; the firewall only
+# admits tailscale0 anyway. The GUI stays on loopback — use an SSH tunnel:
+#   ssh -L 8385:127.0.0.1:8384 dev@<host>  then open http://127.0.0.1:8385
+- name: Restrict Syncthing to the tailnet and disable telemetry
+  ansible.builtin.uri:
+    url: "{{ syncthing_api }}/rest/config/options"
+    method: PATCH
+    headers: { X-API-Key: "{{ syncthing_api_key }}" }
+    body_format: json
+    body: "{{ syncthing_options }}"
+  when: syncthing_config.json.options | combine(syncthing_options) != syncthing_config.json.options
+  changed_when: true
+  vars:
+    syncthing_options:
+      globalAnnounceEnabled: false
+      localAnnounceEnabled: false
+      relaysEnabled: false
+      natEnabled: false
+      urAccepted: -1
+      crashReportingEnabled: false
+      autoUpgradeIntervalH: 0
+
+- name: Bind the Syncthing GUI to loopback only
+  ansible.builtin.uri:
+    url: "{{ syncthing_api }}/rest/config/gui"
+    method: PATCH
+    headers: { X-API-Key: "{{ syncthing_api_key }}" }
+    body_format: json
+    body: { address: "127.0.0.1:8384" }
+  when: syncthing_config.json.gui.address != '127.0.0.1:8384'
+  changed_when: true
+
+- name: Remove devices that are not in syncthing_peers
+  ansible.builtin.uri:
+    url: "{{ syncthing_api }}/rest/config/devices/{{ item.deviceID }}"
+    method: DELETE
+    headers: { X-API-Key: "{{ syncthing_api_key }}" }
+  loop: "{{ syncthing_config.json.devices | rejectattr('deviceID', 'in', syncthing_peer_ids + [syncthing_my_id]) | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: true
+
+- name: Remove folders other than the shared one
+  ansible.builtin.uri:
+    url: "{{ syncthing_api }}/rest/config/folders/{{ item.id }}"
+    method: DELETE
+    headers: { X-API-Key: "{{ syncthing_api_key }}" }
+  loop: "{{ syncthing_config.json.folders | rejectattr('id', 'equalto', syncthing_folder.id) | list }}"
+  loop_control:
+    label: "{{ item.id }}"
+  changed_when: true
+
+# Never an introducer and never auto-accepting: a peer cannot pull more
+# devices or folders onto this box.
+- name: Configure Syncthing peers
+  ansible.builtin.uri:
+    url: "{{ syncthing_api }}/rest/config/devices/{{ item.id }}"
+    method: PUT
+    headers: { X-API-Key: "{{ syncthing_api_key }}" }
+    body_format: json
+    body: "{{ syncthing_current | combine(syncthing_wanted) }}"
+  loop: "{{ syncthing_peers }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: syncthing_current | combine(syncthing_wanted) != syncthing_current
+  changed_when: true
+  vars:
+    syncthing_current: "{{ syncthing_config.json.devices | selectattr('deviceID', 'equalto', item.id) | first | default({}) }}"
+    syncthing_wanted:
+      deviceID: "{{ item.id }}"
+      name: "{{ item.name }}"
+      addresses: ["{{ item.address }}"]
+      introducer: false
+      autoAcceptFolders: false
+
+- name: Configure the shared folder
+  ansible.builtin.uri:
+    url: "{{ syncthing_api }}/rest/config/folders/{{ syncthing_folder.id }}"
+    method: PUT
+    headers: { X-API-Key: "{{ syncthing_api_key }}" }
+    body_format: json
+    body: "{{ syncthing_current | combine(syncthing_wanted) }}"
+  when: >-
+    syncthing_current | length == 0
+    or (syncthing_current | combine(syncthing_wanted | dict2items | rejectattr('key', 'equalto', 'devices') | items2dict)) != syncthing_current
+    or (syncthing_current.devices | map(attribute='deviceID') | sort) != (syncthing_wanted.devices | map(attribute='deviceID') | sort)
+  changed_when: true
+  vars:
+    syncthing_current: "{{ syncthing_config.json.folders | selectattr('id', 'equalto', syncthing_folder.id) | first | default({}) }}"
+    syncthing_wanted:
+      id: "{{ syncthing_folder.id }}"
+      label: "{{ syncthing_folder.label }}"
+      path: "{{ syncthing_folder.path }}"
+      type: "{{ syncthing_folder.type }}"
+      devices: "{{ (syncthing_peer_ids + [syncthing_my_id]) | map('community.general.dict_kv', 'deviceID') | list }}"
+
+# Syncthing loads .stignore when the folder starts but only rereads it on a
+# rescan, so push the patterns through the API too and confirm they took.
+- name: Read the folder's active ignore patterns
+  ansible.builtin.uri:
+    url: "{{ syncthing_api }}/rest/db/ignores?folder={{ syncthing_folder.id }}"
+    headers: { X-API-Key: "{{ syncthing_api_key }}" }
+  register: syncthing_ignores
+
+- name: Apply the folder's ignore patterns
+  ansible.builtin.uri:
+    url: "{{ syncthing_api }}/rest/db/ignores?folder={{ syncthing_folder.id }}"
+    method: POST
+    headers: { X-API-Key: "{{ syncthing_api_key }}" }
+    body_format: json
+    body: { ignore: "{{ syncthing_folder.ignores }}" }
+  when: syncthing_ignores.json.ignore != syncthing_folder.ignores
+  changed_when: true
+
+- name: Verify only the intended paths are synced
+  ansible.builtin.uri:
+    url: "{{ syncthing_api }}/rest/db/ignores?folder={{ syncthing_folder.id }}"
+    headers: { X-API-Key: "{{ syncthing_api_key }}" }
+  register: syncthing_ignores_after
+  failed_when: syncthing_ignores_after.json.ignore != syncthing_folder.ignores

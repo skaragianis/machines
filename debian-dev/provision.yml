@@ -28,6 +28,8 @@
       ansible.builtin.import_tasks: tasks/unattended_upgrades.yml
     - name: Install Tailscale
       ansible.builtin.import_tasks: tasks/tailscale.yml
+    - name: Install and configure Syncthing
+      ansible.builtin.import_tasks: tasks/syncthing.yml
     - name: Install the Go toolchain
       ansible.builtin.import_tasks: tasks/golang.yml
     - name: Install tools from GitHub releases
