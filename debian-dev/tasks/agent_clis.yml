@@ -1,0 +1,58 @@
+---
+# Claude Code and Codex use their vendors' recommended native installers, which
+# put a launcher in ~/.local/bin (versions under ~/.local/share/claude and
+# ~/.codex/packages/standalone) and then keep themselves up to date. They used
+# to come from pnpm globals, but those copies can't be touched by the tools' own
+# auto-updaters, so an update would land in a different path from the binary
+# actually on PATH. PATH is pinned to include ~/.local/bin so neither installer
+# decides it's missing and appends a PATH block to a shell profile — dev's PATH
+# is owned by chezmoi (fish) and /etc/profile.d/dev-path.sh (bash).
+
+# Drop the old pnpm-managed copies so only the native install is on PATH.
+- name: Remove pnpm-managed Claude Code and Codex
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      export PNPM_HOME="$HOME/.local/share/pnpm"
+      export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
+      command -v pnpm >/dev/null || exit 0
+      for pkg in @anthropic-ai/claude-code @openai/codex; do
+        if pnpm ls -g --depth 0 --parseable "$pkg" 2>/dev/null | grep -qF "node_modules/$pkg"; then
+          pnpm remove -g "$pkg"
+          echo "removed $pkg"
+        fi
+      done
+    executable: /bin/bash
+  register: agent_pnpm_cleanup
+  changed_when: "'removed' in agent_pnpm_cleanup.stdout"
+
+# The installer downloads the full binary every time, so run it only once; after
+# that `claude update` (below) and the background auto-updater keep it current.
+- name: Install Claude Code (native installer)  # noqa: command-instead-of-module
+  ansible.builtin.shell:
+    cmd: set -o pipefail && curl -fsSL https://claude.ai/install.sh | bash
+    executable: /bin/bash
+    creates: "/home/{{ debian_dev_user }}/.local/bin/claude"
+  environment:
+    PATH: "/home/{{ debian_dev_user }}/.local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Update Claude Code to latest
+  ansible.builtin.command:
+    cmd: "/home/{{ debian_dev_user }}/.local/bin/claude update"
+  environment:
+    PATH: "/home/{{ debian_dev_user }}/.local/bin:{{ ansible_facts['env']['PATH'] }}"
+  register: claude_update
+  changed_when: "'Successfully updated' in claude_update.stdout"
+
+# Codex's installer is also its updater: it resolves the latest release and
+# skips the download when that release is already installed, so it's safe to
+# run every play. CODEX_NON_INTERACTIVE stops it prompting to launch codex.
+- name: Install/upgrade Codex (native installer)  # noqa: command-instead-of-module
+  ansible.builtin.shell:
+    cmd: set -o pipefail && curl -fsSL https://chatgpt.com/codex/install.sh | sh
+    executable: /bin/bash
+  environment:
+    CODEX_NON_INTERACTIVE: "1"
+    PATH: "/home/{{ debian_dev_user }}/.local/bin:{{ ansible_facts['env']['PATH'] }}"
+  register: codex_install
+  changed_when: "'Downloading Codex CLI' in codex_install.stdout"

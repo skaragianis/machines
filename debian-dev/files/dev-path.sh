@@ -11,7 +11,8 @@
 # Entries mirror what this repo installs outside the default PATH:
 #   $PNPM_HOME, $PNPM_HOME/bin  pnpm itself and its global CLIs (tasks/node.yml)
 #   ~/.cargo/bin                rustup/cargo, installed --no-modify-path
-#   ~/.local/bin                uv and its tool shims (tasks/python_tools.yml)
+#   ~/.local/bin                uv and its tool shims (tasks/python_tools.yml),
+#                               claude and codex (tasks/agent_clis.yml)
 #   ~/go/bin                    binaries from `go install`
 #   /usr/local/go/bin           the Go toolchain (go/gofmt are also symlinked
 #                               into /usr/local/bin, so this is belt-and-braces)

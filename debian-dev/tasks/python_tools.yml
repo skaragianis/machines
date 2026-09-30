@@ -11,4 +11,5 @@
   loop:
     - ruff
     - ty
+    - yamllint
   changed_when: true

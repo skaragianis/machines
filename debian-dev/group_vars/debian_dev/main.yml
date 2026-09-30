@@ -78,6 +78,7 @@ summary_tools:
   - { name: uv, cmd: uv --version }
   - { name: ruff, cmd: ruff --version }
   - { name: ty, cmd: ty --version }
+  - { name: yamllint, cmd: yamllint --version }
   - { name: docker, cmd: docker --version }
   - { name: gh, cmd: gh --version }
   - { name: psql, cmd: psql --version }
