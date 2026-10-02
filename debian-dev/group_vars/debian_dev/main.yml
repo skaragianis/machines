@@ -26,6 +26,7 @@ apt_packages:
   - htop
   - libclang-dev
   - libtree-sitter-dev
+  - nvme-cli
   - sqlite3
   - tmux
   - tree
