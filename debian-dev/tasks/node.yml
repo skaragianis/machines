@@ -34,7 +34,6 @@
     executable: /bin/bash
   loop:
     - npm
-    - tree-sitter-cli
     - prettier
     - markdownlint-cli2
     - typescript

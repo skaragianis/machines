@@ -8,6 +8,14 @@
     executable: /bin/bash
     creates: "/home/{{ debian_dev_user }}/.cargo/bin/cargo"
 
+# rust-analyzer isn't in rustup's default profile; once added, the update
+# below keeps it in step with the toolchain. rustup logs to stderr.
+- name: Install rust-analyzer component
+  ansible.builtin.command:
+    cmd: "/home/{{ debian_dev_user }}/.cargo/bin/rustup component add rust-analyzer"
+  register: rust_analyzer_add
+  changed_when: "'is up to date' not in rust_analyzer_add.stderr"
+
 # rustup update tracks the latest stable toolchain (and updates rustup
 # itself) on every run; changed only when it actually moves something.
 - name: Update Rust toolchain to latest stable
@@ -15,3 +23,11 @@
     cmd: "/home/{{ debian_dev_user }}/.cargo/bin/rustup update stable"
   register: rustup_update
   changed_when: "'unchanged' not in rustup_update.stdout"
+
+# cargo install checks crates.io and rebuilds only when a newer release exists;
+# otherwise it logs "already installed" to stderr and leaves the binary alone.
+- name: Install/upgrade tree-sitter-cli via cargo
+  ansible.builtin.command:
+    cmd: "/home/{{ debian_dev_user }}/.cargo/bin/cargo install --locked tree-sitter-cli"
+  register: tree_sitter_install
+  changed_when: "'already installed' not in tree_sitter_install.stderr"

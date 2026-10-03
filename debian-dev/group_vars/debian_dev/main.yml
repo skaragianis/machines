@@ -13,7 +13,7 @@ dev_authorized_keys:
 
 # Only slow-moving system packages stay on apt. Fast-moving developer tools
 # (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk, delta, difftastic,
-# herdr, pi, bun, floci, rtk, tuxedo) are installed
+# herdr, pi, bun, floci, rtk, tuxedo, just) are installed
 # directly from upstream so every run tracks the latest release. See
 # github_release_tools
 apt_packages:
@@ -25,8 +25,10 @@ apt_packages:
   - gnupg
   - htop
   - libclang-dev
+  - libssl-dev
   - libtree-sitter-dev
   - nvme-cli
+  - pkg-config
   - sqlite3
   - tmux
   - tree
@@ -73,6 +75,7 @@ summary_tools:
   - { name: go, cmd: go version }
   - { name: rustc, cmd: rustc --version }
   - { name: cargo, cmd: cargo --version }
+  - { name: rust-analyzer, cmd: rust-analyzer --version }
   - { name: node, cmd: node --version }
   - { name: pnpm, cmd: pnpm --version }
   - { name: bun, cmd: bun --version }
@@ -86,6 +89,7 @@ summary_tools:
   - { name: tailscale, cmd: tailscale version }
   - { name: syncthing, cmd: syncthing --version }
   - { name: task, cmd: task --version }
+  - { name: just, cmd: just --version }
   - { name: opentofu, cmd: tofu version }
   - { name: render, cmd: render --version }
   - { name: neovim, cmd: nvim --version }

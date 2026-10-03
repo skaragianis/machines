@@ -135,3 +135,9 @@ github_release_tools:
     asset: "tuxedo-v{version}-{target}.tar.gz"
     subdir: "tuxedo-v{version}-{target}"
     bins: [tuxedo]
+  - name: just
+    repo: casey/just
+    target: { x86_64: x86_64-unknown-linux-musl, aarch64: aarch64-unknown-linux-musl }
+    asset: "just-{version}-{target}.tar.gz"
+    subdir: ""
+    bins: [just]
