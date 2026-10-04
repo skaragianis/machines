@@ -1,4 +1,59 @@
 ---
+# Debian's tmux lags upstream (Trixie ships 3.5a), so build the latest release
+# from its source tarball into /usr/local, rebuilding only when the release
+# tag differs from what `tmux -V` reports. A server already running from the
+# old binary keeps going but new clients can't talk to it after an upgrade:
+# run `tmux kill-server` (or reboot) once to pick up the new version.
+- name: Resolve the latest tmux release
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/tmux/tmux/releases/latest
+    headers:
+      Accept: application/vnd.github+json
+  register: tmux_release
+
+- name: Check the installed tmux version
+  ansible.builtin.command: /usr/local/bin/tmux -V
+  register: tmux_installed
+  changed_when: false
+  failed_when: false
+
+- name: Build and install tmux from source
+  when: tmux_installed.stdout | default('') != 'tmux ' ~ tmux_tag
+  vars:
+    tmux_tag: "{{ tmux_release.json.tag_name }}"
+    tmux_src: "/tmp/tmux-{{ tmux_release.json.tag_name }}"
+  block:
+    - name: Download and extract the tmux source
+      ansible.builtin.unarchive:
+        src: "https://github.com/tmux/tmux/releases/download/{{ tmux_tag }}/tmux-{{ tmux_tag }}.tar.gz"
+        dest: /tmp
+        remote_src: true
+
+    - name: Configure and compile tmux
+      ansible.builtin.shell:
+        cmd: ./configure --prefix=/usr/local && make -j"$(nproc)"
+        chdir: "{{ tmux_src }}"
+      changed_when: true
+
+    - name: Install tmux to /usr/local
+      become: true
+      ansible.builtin.command:
+        cmd: make install
+        chdir: "{{ tmux_src }}"
+      changed_when: true
+
+    - name: Remove the tmux build tree
+      ansible.builtin.file:
+        path: "{{ tmux_src }}"
+        state: absent
+
+# Drop Debian's older copy so only the source build is on PATH.
+- name: Remove the apt tmux package
+  become: true
+  ansible.builtin.apt:
+    name: tmux
+    state: absent
+
 # TPM and the plugins it manages. The @plugin list lives in the chezmoi-owned
 # ~/.tmux.conf, so this runs after dotfiles.yml. TPM's bin/ scripts read that
 # file directly and don't need a running tmux server.
