@@ -83,13 +83,6 @@ github_release_tools:
     asset: "difft-{version}-{target}.tar.gz"
     subdir: ""
     bins: [difft]
-  - name: herdr
-    repo: ogulcancelik/herdr
-    archive: false
-    target: { x86_64: x86_64, aarch64: aarch64 }
-    asset: "herdr-linux-{target}"
-    subdir: ""
-    bins: [herdr]
   - name: pi
     repo: earendil-works/pi
     target: { x86_64: x64, aarch64: arm64 }

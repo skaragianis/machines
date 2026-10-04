@@ -13,7 +13,7 @@ dev_authorized_keys:
 
 # Only slow-moving system packages stay on apt. Fast-moving developer tools
 # (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk, delta, difftastic,
-# herdr, pi, bun, floci, rtk, tuxedo, just, tmux) are installed
+# pi, bun, floci, rtk, tuxedo, just, tmux) are installed
 # directly from upstream so every run tracks the latest release. See
 # github_release_tools (tmux is built from source in tasks/tmux.yml).
 apt_packages:
@@ -106,7 +106,6 @@ summary_tools:
   - { name: hunk, cmd: hunk --version }
   - { name: delta, cmd: delta --version }
   - { name: difftastic, cmd: difft --version }
-  - { name: herdr, cmd: herdr --version }
   - { name: floci, cmd: floci --version }
   - { name: rtk, cmd: rtk --version }
   - { name: pi, cmd: pi --version }
