@@ -60,6 +60,8 @@
       ansible.builtin.import_tasks: tasks/bash_path.yml
     - name: Apply dotfiles
       ansible.builtin.import_tasks: tasks/dotfiles.yml
+    - name: Install tmux plugins
+      ansible.builtin.import_tasks: tasks/tmux.yml
     - name: Summarise installed tools
       ansible.builtin.import_tasks: tasks/summary.yml
 

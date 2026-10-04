@@ -1,0 +1,55 @@
+---
+# TPM and the plugins it manages. The @plugin list lives in the chezmoi-owned
+# ~/.tmux.conf, so this runs after dotfiles.yml. TPM's bin/ scripts read that
+# file directly and don't need a running tmux server.
+- name: Clone/update TPM
+  ansible.builtin.git:
+    repo: https://github.com/tmux-plugins/tpm
+    dest: "/home/{{ debian_dev_user }}/.tmux/plugins/tpm"
+    version: master
+
+- name: Install TPM plugins
+  ansible.builtin.command:
+    cmd: "/home/{{ debian_dev_user }}/.tmux/plugins/tpm/bin/install_plugins"
+  register: tpm_install
+  changed_when: "'download success' in tpm_install.stdout"
+
+- name: Update TPM plugins to latest
+  ansible.builtin.command:
+    cmd: "/home/{{ debian_dev_user }}/.tmux/plugins/tpm/bin/update_plugins all"
+  register: tpm_update
+  changed_when: "'update success' in tpm_update.stdout"
+
+# tmux-agent-sidebar needs a compiled binary in its bin/. Left to itself, the
+# plugin pops up an interactive install menu inside tmux whenever that binary
+# is missing or its version differs from the plugin's Cargo.toml, so fetch the
+# matching release binary here instead.
+- name: Read tmux-agent-sidebar's Cargo.toml
+  ansible.builtin.slurp:
+    src: "{{ agent_sidebar_dir }}/Cargo.toml"
+  register: agent_sidebar_cargo
+
+- name: Read the installed tmux-agent-sidebar version
+  ansible.builtin.command:
+    cmd: "{{ agent_sidebar_dir }}/bin/tmux-agent-sidebar version"
+  register: agent_sidebar_installed
+  changed_when: false
+  failed_when: false
+
+- name: Create tmux-agent-sidebar's bin directory
+  ansible.builtin.file:
+    path: "{{ agent_sidebar_dir }}/bin"
+    state: directory
+    mode: "0755"
+
+- name: Download the tmux-agent-sidebar binary
+  ansible.builtin.get_url:
+    url: "https://github.com/hiroppy/tmux-agent-sidebar/releases/latest/download/tmux-agent-sidebar-linux-{{ ansible_facts['architecture'] }}"
+    dest: "{{ agent_sidebar_dir }}/bin/tmux-agent-sidebar"
+    mode: "0755"
+    force: true
+  when: agent_sidebar_installed.stdout | default('') != agent_sidebar_expected
+  vars:
+    agent_sidebar_expected: >-
+      {{ agent_sidebar_cargo.content | b64decode
+         | regex_search('^version *= *"([^"]+)"', '\1', multiline=True) | first }}

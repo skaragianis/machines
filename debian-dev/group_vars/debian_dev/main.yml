@@ -42,6 +42,7 @@ fish_path: /usr/bin/fish
 github_key_comment: debian-dev
 node_version: "26"
 dotfiles_repo: git@github.com:skaragianis/dotfiles.git
+agent_sidebar_dir: "/home/{{ debian_dev_user }}/.tmux/plugins/tmux-agent-sidebar"
 
 # Syncthing (tasks/syncthing.yml). Only syncthing_folder is synced to this box,
 # and only with these peers; anything else found in its config is removed.
