@@ -24,6 +24,8 @@
       ansible.builtin.import_tasks: tasks/firewall.yml
     - name: Install apt packages
       ansible.builtin.import_tasks: tasks/apt_packages.yml
+    - name: Tune swap, CPU and I/O
+      ansible.builtin.import_tasks: tasks/system_tuning.yml
     - name: Configure unattended upgrades
       ansible.builtin.import_tasks: tasks/unattended_upgrades.yml
     - name: Install Tailscale
@@ -68,3 +70,5 @@
   handlers:
     - name: SSH restart handler
       ansible.builtin.import_tasks: handlers/restart_ssh.yml
+    - name: System tuning handlers
+      ansible.builtin.import_tasks: handlers/system_tuning.yml

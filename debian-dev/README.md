@@ -4,7 +4,7 @@ Provisions a fresh Debian machine as a dev server. Run from the Mac.
 
 ## Manual prerequisites
 
-1. **Create the machine**: install Debian Trixie, set a strong root password, create a `dev` user with a normal password, and install the SSH server.
+1. **Create the machine**: install Debian Trixie, set a strong root password, create a `dev` user with a normal password, and install the SSH server. Partition manually and **don't create a swap partition**: provisioning sets up zram plus `/swapfile` (see `swapfile_size` / `zram_size`).
 2. **Machine IP**: note the IP address of the machine. You'll be prompted for this when you run the playbook (or pass it with
    `-e machine_ip=<ip>` to skip the prompt).
 

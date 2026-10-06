@@ -1,0 +1,161 @@
+---
+# Memory, CPU and I/O tuning for heavy builds. Runs on the x86 server and on an
+# aarch64 VM: anything hardware-specific is gated on the sysfs file it writes.
+
+# Swap is layered: zram (RAM, compressed, priority 100) fills first, then the
+# swap file on disk (priority 10). Install Debian without a swap partition, or
+# it becomes a third swap device sharing the disk with this one.
+
+# Only created when missing. Changing swapfile_size later does nothing; to
+# resize, `swapoff /swapfile && rm /swapfile` and re-run.
+- name: Create the swap file
+  become: true
+  ansible.builtin.command:
+    cmd: "mkswap --file /swapfile --size {{ swapfile_size }}"
+    creates: /swapfile
+
+- name: Restrict the swap file to root
+  become: true
+  ansible.builtin.file:
+    path: /swapfile
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Add the swap file to fstab
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^/swapfile\s'
+    line: "/swapfile none swap sw,pri=10 0 0"
+
+- name: Read the active swap devices
+  ansible.builtin.command:
+    cmd: swapon --show=NAME --noheadings
+  register: active_swap
+  changed_when: false
+
+- name: Enable the swap file
+  become: true
+  ansible.builtin.command:
+    cmd: swapon /swapfile
+  when: "'/swapfile' not in active_swap.stdout_lines"
+  changed_when: true
+
+# zram-tools (zramswap) would set up a second, competing zram device.
+- name: Remove ModemManager and zram-tools
+  become: true
+  ansible.builtin.apt:
+    name: [modemmanager, zram-tools]
+    state: absent
+    purge: true
+
+- name: Install the zram generator
+  become: true
+  ansible.builtin.apt:
+    name: systemd-zram-generator
+    state: present
+
+- name: Configure zram swap
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/systemd/zram-generator.conf
+    content: |
+      [zram0]
+      zram-size = {{ zram_size }}
+      compression-algorithm = zstd
+      swap-priority = 100
+    mode: "0644"
+  notify: Start zram
+
+# zswap would compress pages on their way into zram, compressing them twice.
+- name: Check whether the kernel has zswap
+  ansible.builtin.stat:
+    path: /sys/module/zswap/parameters/enabled
+  register: zswap_param
+
+- name: Keep zswap off at boot
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/zswap-off.conf
+    content: "w /sys/module/zswap/parameters/enabled - - - - N\n"
+    mode: "0644"
+  when: zswap_param.stat.exists
+
+- name: Turn zswap off now
+  become: true
+  ansible.builtin.shell:
+    cmd: |
+      f=/sys/module/zswap/parameters/enabled
+      [ "$(cat $f)" = N ] && exit 0
+      echo N > $f && echo changed
+  register: zswap_off
+  changed_when: "'changed' in zswap_off.stdout"
+  when: zswap_param.stat.exists
+
+# High swappiness suits zram: swapping to RAM is cheaper than dropping page
+# cache. page-cluster 0 turns off swap readahead, which only helps on disk.
+- name: Tune swap sysctls
+  become: true
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-swap.conf
+    reload: true
+  loop:
+    - name: vm.swappiness
+      value: "150"
+    - name: vm.page-cluster
+      value: "0"
+
+# Energy-performance preference only exists with intel_pstate (active) or
+# amd-pstate-epp, where the "powersave" governor is the dynamic one and is left
+# alone. VMs and other drivers have no such file, so this is skipped there.
+- name: Check whether the CPU exposes an energy-performance preference
+  ansible.builtin.stat:
+    path: /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference
+  register: cpu_epp
+
+- name: Prefer performance on CPU add (udev)
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/udev/rules.d/99-cpu-epp.rules
+    content: |
+      SUBSYSTEM=="cpu", KERNEL=="cpu[0-9]*", ACTION=="add", ATTR{cpufreq/energy_performance_preference}="performance"
+    mode: "0644"
+  notify: Reload udev rules
+  when: cpu_epp.stat.exists
+
+# The rule only fires on add, so apply it to the CPUs that are already up.
+- name: Prefer performance on the running CPUs
+  become: true
+  ansible.builtin.shell:
+    cmd: |
+      for f in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do
+        [ "$(cat "$f")" = performance ] && continue
+        echo performance > "$f" && echo changed
+      done
+  register: cpu_epp_now
+  changed_when: "'changed' in cpu_epp_now.stdout"
+  when: cpu_epp.stat.exists
+
+# The kernel already picks "none" for multi-queue NVMe; this pins it. DEVTYPE
+# keeps partitions (nvme0n1p1), which have no scheduler, out of the match.
+# Harmless without NVMe (virtio disks are vd*).
+- name: Use no I/O scheduler on NVMe disks
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/udev/rules.d/60-ioscheduler.rules
+    content: |
+      ACTION=="add|change", KERNEL=="nvme[0-9]*n[0-9]*", ENV{DEVTYPE}=="disk", ATTR{queue/scheduler}="none"
+    mode: "0644"
+  notify:
+    - Reload udev rules
+    - Trigger block udev events
+
+- name: Enable weekly TRIM
+  become: true
+  ansible.builtin.systemd_service:
+    name: fstrim.timer
+    enabled: true
+    state: started

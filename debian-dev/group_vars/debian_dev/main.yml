@@ -38,6 +38,11 @@ apt_packages:
   - wget
   - zip
 
+# Swap (tasks/system_tuning.yml). swapfile_size only applies when /swapfile is
+# first created. zram_size is a zram-generator expression.
+swapfile_size: 8G
+zram_size: "ram / 2"
+
 pnpm_home: "/home/{{ debian_dev_user }}/.local/share/pnpm"
 pnpm_bin: "{{ pnpm_home }}/bin"
 fish_path: /usr/bin/fish
