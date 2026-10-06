@@ -13,12 +13,13 @@ dev_authorized_keys:
 
 # Only slow-moving system packages stay on apt. Fast-moving developer tools
 # (Go, Docker, fzf, lazygit, ripgrep, fd, zoxide, jq, hunk, delta, difftastic,
-# pi, bun, floci, rtk, tuxedo, just, tmux) are installed
+# pi, bun, floci, rtk, tuxedo, just, sccache, tmux) are installed
 # directly from upstream so every run tracks the latest release. See
 # github_release_tools (tmux is built from source in tasks/tmux.yml).
 apt_packages:
   - bison
   - build-essential
+  - clang
   - cmake
   - curl
   - fish
@@ -30,6 +31,8 @@ apt_packages:
   - libncurses-dev
   - libssl-dev
   - libtree-sitter-dev
+  - lm-sensors
+  - mold
   - nvme-cli
   - pkg-config
   - sqlite3
@@ -84,6 +87,9 @@ summary_tools:
   - { name: rustc, cmd: rustc --version }
   - { name: cargo, cmd: cargo --version }
   - { name: rust-analyzer, cmd: rust-analyzer --version }
+  - { name: sccache, cmd: sccache --version }
+  - { name: mold, cmd: mold --version }
+  - { name: clang, cmd: clang --version }
   - { name: node, cmd: node --version }
   - { name: pnpm, cmd: pnpm --version }
   - { name: bun, cmd: bun --version }
