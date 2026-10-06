@@ -30,6 +30,7 @@
     line: "/swapfile none swap sw,pri=10 0 0"
 
 - name: Read the active swap devices
+  become: true
   ansible.builtin.command:
     cmd: swapon --show=NAME --noheadings
   register: active_swap
@@ -38,7 +39,7 @@
 - name: Enable the swap file
   become: true
   ansible.builtin.command:
-    cmd: swapon /swapfile
+    cmd: swapon --priority 10 /swapfile
   when: "'/swapfile' not in active_swap.stdout_lines"
   changed_when: true
 
