@@ -109,6 +109,16 @@
     - name: vm.page-cluster
       value: "0"
 
+# Debian's default (3) blocks perf for non-root users entirely; 1 allows
+# profiling your own processes, user and kernel space.
+- name: Allow perf for non-root users
+  become: true
+  ansible.posix.sysctl:
+    name: kernel.perf_event_paranoid
+    value: "1"
+    sysctl_file: /etc/sysctl.d/99-perf.conf
+    reload: true
+
 # Energy-performance preference only exists with intel_pstate (active) or
 # amd-pstate-epp, where the "powersave" governor is the dynamic one and is left
 # alone. VMs and other drivers have no such file, so this is skipped there.

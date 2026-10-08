@@ -25,17 +25,21 @@ apt_packages:
   - fish
   - git
   - gnupg
+  - heaptrack
   - htop
+  - hyperfine
   - libclang-dev
   - libevent-dev
   - libncurses-dev
   - libssl-dev
   - libtree-sitter-dev
+  - linux-perf
   - lm-sensors
   - mold
   - nvme-cli
   - pkg-config
   - sqlite3
+  - strace
   - tree
   - unzip
   - wget
