@@ -140,3 +140,9 @@ github_release_tools:
     asset: "sccache-v{version}-{target}.tar.gz"
     subdir: "sccache-v{version}-{target}"
     bins: [sccache]
+  - name: btop
+    repo: aristocratos/btop
+    target: { x86_64: x86_64-unknown-linux-musl, aarch64: aarch64-unknown-linux-musl }
+    asset: "btop-{target}.tar.gz"
+    subdir: "btop/bin"
+    bins: [btop]
