@@ -1,19 +1,21 @@
 ---
 # Included once per entry in github_release_tools (loop_var: tool). Resolves the
-# latest release tag from the GitHub API, downloads that release's asset,
+# latest release tag from the github.com/<repo>/releases/latest redirect (not
+# the REST API, whose unauthenticated limit is 60 requests/hour and is easily
+# exhausted by this loop), downloads that release's asset,
 # extracts it under /opt/<name>/, and symlinks the binaries into
 # /usr/local/bin.
 - name: "Resolve latest release tag for {{ tool.name }}"
   ansible.builtin.uri:
-    url: "https://api.github.com/repos/{{ tool.repo }}/releases/latest"
-    headers:
-      Accept: application/vnd.github+json
+    url: "https://github.com/{{ tool.repo }}/releases/latest"
+    follow_redirects: none
+    status_code: 302
   register: gh_release
   when: tool.tag is not defined
 
 - name: "Pin the release tag for {{ tool.name }}"
   ansible.builtin.set_fact:
-    gh_tag: "{{ tool.tag if tool.tag is defined else gh_release.json.tag_name }}"
+    gh_tag: "{{ tool.tag if tool.tag is defined else gh_release.location | regex_replace('^.*/releases/tag/', '') | urldecode }}"
 
 - name: "Read the recorded tag for {{ tool.name }}"
   ansible.builtin.slurp:

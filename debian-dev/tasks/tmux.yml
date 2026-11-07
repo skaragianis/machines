@@ -6,9 +6,9 @@
 # run `tmux kill-server` (or reboot) once to pick up the new version.
 - name: Resolve the latest tmux release
   ansible.builtin.uri:
-    url: https://api.github.com/repos/tmux/tmux/releases/latest
-    headers:
-      Accept: application/vnd.github+json
+    url: https://github.com/tmux/tmux/releases/latest
+    follow_redirects: none
+    status_code: 302
   register: tmux_release
 
 - name: Check the installed tmux version
@@ -20,8 +20,8 @@
 - name: Build and install tmux from source
   when: tmux_installed.stdout | default('') != 'tmux ' ~ tmux_tag
   vars:
-    tmux_tag: "{{ tmux_release.json.tag_name }}"
-    tmux_src: "/tmp/tmux-{{ tmux_release.json.tag_name }}"
+    tmux_tag: "{{ tmux_release.location | regex_replace('^.*/releases/tag/', '') | urldecode }}"
+    tmux_src: "/tmp/tmux-{{ tmux_tag }}"
   block:
     - name: Download and extract the tmux source
       ansible.builtin.unarchive:
