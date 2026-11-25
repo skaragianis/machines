@@ -30,11 +30,15 @@ apt_packages:
   - hyperfine
   - libclang-dev
   - libevent-dev
+  - libfontconfig-dev
   - libncurses-dev
   - libssl-dev
   - libtree-sitter-dev
+  - libxkbcommon-dev
+  - libxkbcommon-x11-dev
   - linux-perf
   - lm-sensors
+  - mesa-vulkan-drivers
   - mold
   - nvme-cli
   - pkg-config
@@ -43,6 +47,7 @@ apt_packages:
   - tree
   - unzip
   - wget
+  - x11-apps
   - zip
 
 # Swap (tasks/system_tuning.yml). swapfile_size only applies when /swapfile is
